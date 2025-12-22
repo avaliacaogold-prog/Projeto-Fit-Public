@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { Client, Payment, Evaluation } from '../types';
+import { Client, Payment, Evaluation, PaymentStatus } from '../types';
 
 interface DashboardProps {
   clients: Client[];
@@ -11,11 +11,12 @@ interface DashboardProps {
 }
 
 const Dashboard: React.FC<DashboardProps> = ({ clients, payments, evaluations, onLoadDemo }) => {
+  // Use PaymentStatus enum for safer filtering
   const totalPaid = payments
-    .filter(p => p.status === 'PAID')
+    .filter(p => p.status === PaymentStatus.PAID)
     .reduce((acc, curr) => acc + curr.amount, 0);
 
-  const pendingCount = payments.filter(p => p.status === 'PENDING').length;
+  const pendingCount = payments.filter(p => p.status === PaymentStatus.PENDING).length;
 
   const data = [
     { name: 'Semana 1', evals: 4, rev: 1200 },

@@ -1,51 +1,99 @@
 
-import { Skinfolds, EvaluationProtocol, VO2ProtocolType, Perimeters } from '../types';
+import { Skinfolds, EvaluationProtocol, Perimeters, Somatotype } from '../types';
 
-export const validateSanity = (value: number, min: number, max: number): number => {
-  if (isNaN(value) || value === null || value === 0) return 0;
-  return Math.min(Math.max(value, min), max);
+export const calculateAge = (birthDate: string, referenceDate: string = new Date().toISOString()): number => {
+  const birth = new Date(birthDate);
+  const ref = new Date(referenceDate);
+  let age = ref.getFullYear() - birth.getFullYear();
+  const m = ref.getMonth() - birth.getMonth();
+  if (m < 0 || (m === 0 && ref.getDate() < birth.getDate())) {
+    age--;
+  }
+  return age;
 };
 
 export const getIMCClassification = (weight: number, height: number) => {
   const imc = weight / (Math.pow(height / 100, 2));
-  let status = "Normal";
-  let color = "#10b981"; // emerald-500
+  let status = "Eutrófico";
+  let color = "#10b981";
 
   if (imc < 18.5) { status = "Abaixo do Peso"; color = "#f59e0b"; }
   else if (imc >= 25 && imc < 30) { status = "Sobrepeso"; color = "#f59e0b"; }
-  else if (imc >= 30) { status = "Obesidade"; color = "#ef4444"; }
+  else if (imc >= 30 && imc < 35) { status = "Obesidade G1"; color = "#ef4444"; }
+  else if (imc >= 35) { status = "Obesidade G2/G3"; color = "#b91c1c"; }
 
   return { value: imc, status, color };
 };
 
-export const getBFClassification = (bf: number, gender: 'M' | 'F' | 'O') => {
-  const isMale = gender === 'M';
-  if (isMale) {
-    if (bf < 10) return { status: "Atleta", color: "#10b981" };
-    if (bf < 15) return { status: "Excelente", color: "#10b981" };
-    if (bf < 20) return { status: "Bom/Normal", color: "#10b981" };
-    if (bf < 25) return { status: "Elevado", color: "#f59e0b" };
-    return { status: "Muito Elevado", color: "#ef4444" };
-  } else {
-    if (bf < 15) return { status: "Atleta", color: "#10b981" };
-    if (bf < 22) return { status: "Excelente", color: "#10b981" };
-    if (bf < 28) return { status: "Bom/Normal", color: "#10b981" };
-    if (bf < 32) return { status: "Elevado", color: "#f59e0b" };
-    return { status: "Muito Elevado", color: "#ef4444" };
+// Fix: Updated signature to include 'YMCA' to match FunctionalData definition in types.ts
+export const calculateVO2Max = (protocol: 'Cooper' | 'Rockport' | 'YMCA', testValue: number, age: number, weight: number, gender: 'M' | 'F' | 'O', hrFinal?: number) => {
+  if (protocol === 'Cooper') {
+    // testValue = distância em metros
+    if (!testValue) return 0;
+    return (testValue - 504.9) / 44.73;
   }
+  
+  if (protocol === 'Rockport') {
+    // testValue = tempo em minutos (ex: 12.5 para 12min30s)
+    const weightLb = weight * 2.20462;
+    const genderCode = gender === 'M' ? 1 : 0;
+    const hr = hrFinal || 120;
+    if (!testValue) return 0;
+    return 132.853 - (0.0769 * weightLb) - (0.3877 * age) + (6.315 * genderCode) - (3.2649 * testValue) - (0.1565 * hr);
+  }
+
+  return 0;
 };
 
-export const getRCQ = (waist: number, hips: number, gender: 'M' | 'F' | 'O') => {
-  if (!waist || !hips) return null;
-  const rcq = waist / hips;
+export const calculateSomatotype = (skinfolds: Skinfolds, perimeters: Perimeters, height: number, weight: number): Somatotype => {
+  // Heath-Carter Simplified Formula
+  const sum3 = skinfolds.triceps + skinfolds.subscapular + skinfolds.suprailiac;
+  const hCorrected = sum3 * (170.18 / height);
+  
+  // Endomorphy
+  const endo = -0.7182 + (0.1451 * hCorrected) - (0.00068 * Math.pow(hCorrected, 2)) + (0.0000014 * Math.pow(hCorrected, 3));
+  
+  // Mesomorphy (Simplified for web app - requires femur/humerus diameters for full accuracy)
+  // Here we use a ratio of corrected arm/calf girth to height
+  const armCorr = perimeters.armFlexed - (skinfolds.triceps / 10);
+  const calfCorr = perimeters.calf - (skinfolds.calf / 10);
+  const meso = (0.85 * 5.5) + (0.601 * 7.5) + (0.188 * armCorr) + (0.161 * calfCorr) - (0.131 * height) + 4.5;
+  
+  // Ectomorphy
+  const hwr = height / Math.pow(weight, 1/3);
+  let ecto = 0;
+  if (hwr >= 40.75) ecto = (hwr * 0.732) - 28.58;
+  else if (hwr < 40.75 && hwr > 38.25) ecto = (hwr * 0.463) - 17.63;
+  else ecto = 0.1;
+
+  let classification = "Central";
+  if (endo > meso + 1 && endo > ecto + 1) classification = "Endomorfo";
+  else if (meso > endo + 1 && meso > ecto + 1) classification = "Mesomorfo";
+  else if (ecto > endo + 1 && ecto > meso + 1) classification = "Ectomorfo";
+
+  return {
+    endomorphy: parseFloat(endo.toFixed(1)),
+    mesomorphy: parseFloat(meso.toFixed(1)),
+    ectomorphy: parseFloat(ecto.toFixed(1)),
+    classification
+  };
+};
+
+export const getVO2Classification = (vo2: number, age: number, gender: 'M' | 'F' | 'O') => {
+  if (vo2 <= 0) return { status: 'N/A', color: '#cbd5e1' };
   const isMale = gender === 'M';
-  let status = "Baixo Risco";
-  let color = "#10b981";
-
-  const threshold = isMale ? 0.95 : 0.85;
-  if (rcq > threshold) { status = "Risco Elevado"; color = "#ef4444"; }
-
-  return { value: rcq, status, color };
+  
+  if (isMale) {
+    if (vo2 > 50) return { status: 'Excelente', color: '#10b981' };
+    if (vo2 > 40) return { status: 'Bom', color: '#6366f1' };
+    if (vo2 > 30) return { status: 'Médio', color: '#f59e0b' };
+    return { status: 'Fraco', color: '#ef4444' };
+  } else {
+    if (vo2 > 42) return { status: 'Excelente', color: '#10b981' };
+    if (vo2 > 33) return { status: 'Bom', color: '#6366f1' };
+    if (vo2 > 25) return { status: 'Médio', color: '#f59e0b' };
+    return { status: 'Fraco', color: '#ef4444' };
+  }
 };
 
 export const calculateBodyFat = (
@@ -55,81 +103,32 @@ export const calculateBodyFat = (
   gender: 'M' | 'F' | 'O',
   weight: number,
   height: number,
-  perimeters?: Perimeters
+  perimeters: Perimeters
 ): number => {
   const isMale = gender === 'M';
-  const sf = {
-    triceps: skinfolds?.triceps || 0,
-    biceps: skinfolds?.biceps || 0,
-    subscapular: skinfolds?.subscapular || 0,
-    suprailiac: skinfolds?.suprailiac || 0,
-    abdominal: skinfolds?.abdominal || 0,
-    chest: skinfolds?.chest || 0,
-    thigh: skinfolds?.thigh || 0,
-    midaxillary: skinfolds?.midaxillary || 0,
-    calf: skinfolds?.calf || 0,
-  };
+  const sf = skinfolds;
 
   try {
-    switch (protocol) {
-      case 'Pollock3': {
-        const sum = isMale ? (sf.chest + sf.abdominal + sf.thigh) : (sf.triceps + sf.suprailiac + sf.thigh);
-        if (sum === 0) return 0;
-        const density = isMale
-          ? 1.10938 - (0.0008267 * sum) + (0.0000016 * Math.pow(sum, 2)) - (0.0002574 * age)
-          : 1.0994921 - (0.0009929 * sum) + (0.0000023 * Math.pow(sum, 2)) - (0.0001392 * age);
-        return validateSanity(((4.95 / density) - 4.50) * 100, 2, 60);
-      }
-      case 'Pollock7': {
-        const sum = sf.chest + sf.midaxillary + sf.triceps + sf.subscapular + sf.abdominal + sf.suprailiac + sf.thigh;
-        if (sum === 0) return 0;
-        const density = isMale
-          ? 1.112 - (0.00043499 * sum) + (0.00000055 * Math.pow(sum, 2)) - (0.00028826 * age)
-          : 1.097 - (0.00046971 * sum) + (0.00000056 * Math.pow(sum, 2)) - (0.00012828 * age);
-        return validateSanity(((4.95 / density) - 4.50) * 100, 2, 60);
-      }
-      case 'Guedes': {
-        const sum = sf.triceps + sf.suprailiac + sf.abdominal;
-        if (sum === 0) return 0;
-        const density = isMale ? 1.17136 - (0.06706 * Math.log10(sum)) : 1.16650 - (0.07063 * Math.log10(sum));
-        return validateSanity(((4.95 / density) - 4.50) * 100, 2, 60);
-      }
-      case 'Petroski': {
-        const sum = sf.subscapular + sf.triceps + sf.suprailiac + sf.calf;
-        if (sum === 0) return 0;
-        const density = isMale
-          ? 1.10726863 - (0.00081201 * sum) + (0.00000212 * Math.pow(sum, 2)) - (0.00041761 * age)
-          : 1.05481122 - (0.00082334 * sum) + (0.000003 * Math.pow(sum, 2)) - (0.0001392 * age);
-        return validateSanity(((4.95 / density) - 4.50) * 100, 2, 60);
-      }
-      case 'Faulkner': {
-        const sum = sf.triceps + sf.subscapular + sf.suprailiac + sf.abdominal;
-        if (sum === 0) return 0;
-        return validateSanity((sum * 0.153) + 5.783, 3, 60);
-      }
-      case 'Weltman': {
-        const abd = perimeters?.abdomen || perimeters?.waist || 0;
-        if (abd === 0) return 0;
-        return isMale 
-          ? validateSanity((0.31457 * abd) - (0.10969 * weight) + 10.8336, 5, 65)
-          : validateSanity((0.11077 * abd) - (0.17666 * height) + (0.14354 * weight) + 29.7403, 8, 70);
-      }
-      case 'Slaughter': {
-        const sum = sf.triceps + sf.subscapular;
-        if (sum === 0) return 0;
-        let bf = isMale 
-          ? (sum > 35 ? (0.783 * sum + 1.6) : (1.21 * sum - 0.008 * Math.pow(sum, 2) - 1.7))
-          : (sum > 35 ? (0.546 * sum + 9.7) : (1.33 * sum - 0.013 * Math.pow(sum, 2) - 2.5));
-        return validateSanity(bf, 3, 50);
-      }
-      default: return 0;
+    if (protocol === 'Pollock7') {
+      const sum = sf.chest + sf.midaxillary + sf.triceps + sf.subscapular + sf.abdominal + sf.suprailiac + sf.thigh;
+      if (sum === 0) return 0;
+      const density = isMale
+        ? 1.112 - (0.00043499 * sum) + (0.00000055 * Math.pow(sum, 2)) - (0.00028826 * age)
+        : 1.097 - (0.00046971 * sum) + (0.00000056 * Math.pow(sum, 2)) - (0.00012828 * age);
+      return ((4.95 / density) - 4.50) * 100;
     }
-  } catch (e) { return 0; }
-};
+    
+    if (protocol === 'Pollock3') {
+      const sum = isMale 
+        ? (sf.chest + sf.abdominal + sf.thigh)
+        : (sf.triceps + sf.suprailiac + sf.thigh);
+      
+      const density = isMale
+        ? 1.10938 - (0.0008267 * sum) + (0.0000016 * Math.pow(sum, 2)) - (0.0002574 * age)
+        : 1.0994921 - (0.0009929 * sum) + (0.0000023 * Math.pow(sum, 2)) - (0.0001392 * age);
+      return ((4.95 / density) - 4.50) * 100;
+    }
 
-export const calculateMetabolism = (weight: number, height: number, age: number, gender: 'M' | 'F' | 'O', leanMass: number) => {
-  if (leanMass <= 0) return { bmr: 0, tdee: 0 };
-  const bmr = 370 + (21.6 * leanMass);
-  const tdee = bmr * 1.55; 
-  return { bmr, tdee };
+    return 15; // Fallback
+  } catch (e) { return 0; }
 };

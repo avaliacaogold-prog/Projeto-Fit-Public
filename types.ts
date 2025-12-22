@@ -11,6 +11,13 @@ export interface ProfessionalProfile {
   phone: string;
 }
 
+export interface Somatotype {
+  endomorphy: number;
+  mesomorphy: number;
+  ectomorphy: number;
+  classification: string;
+}
+
 export interface Client {
   id: string;
   name: string;
@@ -23,51 +30,42 @@ export interface Client {
   trainingFrequency?: number;
   targetSplit?: TrainingSplit;
   currentPlan?: PlanType;
-  healthConditions?: string[];
 }
 
 export interface ClinicalData {
-  bloodPressure?: string;
+  bloodPressure: string;
+  restingHR: number;
   fastingGlucose?: number;
-  restingHR?: number;
   totalCholesterol?: number;
-  orthopedicNotes?: string;
-  metabolicSyndromeRisk: boolean;
+  riskFactors: string[];
+  acsmRiskStratification: 'Baixo' | 'Moderado' | 'Alto';
 }
 
-export interface Somatotype {
-  endomorphy: number;
-  mesomorphy: number;
-  ectomorphy: number;
-  classification: string;
-  humerusDiameter?: number;
-  femurDiameter?: number;
-}
-
-export type EvaluationProtocol = 'Pollock3' | 'Pollock7' | 'Guedes' | 'Weltman' | 'Slaughter' | 'Petroski' | 'Faulkner' | 'Bioimpedance';
-
-/* Fix: Added missing VO2ProtocolType */
-export type VO2ProtocolType = 'Cooper' | 'Rockport' | 'Balke' | 'YMCA';
-
-/* Fix: Added missing FunctionalData for VO2 and functional metrics */
 export interface FunctionalData {
   vo2Max?: number;
   vo2Classification?: string;
+  vo2Protocol?: 'Cooper' | 'Rockport' | 'YMCA';
+  testValue?: number; // Metros ou Minutos dependendo do protocolo
+  hrFinal?: number;
+  flexibilityTest?: string;
+  pushUpTest?: number;
 }
+
+export type EvaluationProtocol = 'Pollock3' | 'Pollock7' | 'Guedes' | 'Petroski' | 'Faulkner' | 'Weltman' | 'Bioimpedance';
 
 export interface Perimeters {
   waist: number;
   hips: number;
-  abdomen?: number;
-  chest?: number;
-  arm?: number;
-  armFlexed?: number;
-  forearm?: number;
-  neck?: number;
-  shoulders?: number;
-  thigh?: number;
-  thighProximal?: number;
-  calf?: number;
+  abdomen: number;
+  chest: number;
+  arm: number;
+  armFlexed: number;
+  forearm: number;
+  neck: number;
+  shoulders: number;
+  thigh: number;
+  thighProximal: number;
+  calf: number;
 }
 
 export interface Skinfolds {
@@ -79,7 +77,7 @@ export interface Skinfolds {
   chest: number;
   thigh: number;
   midaxillary: number;
-  calf?: number;
+  calf: number;
 }
 
 export interface Evaluation {
@@ -92,10 +90,20 @@ export interface Evaluation {
   height: number;
   perimeters: Perimeters;
   skinfolds?: Skinfolds;
-  anamnesis: Anamnesis;
-  clinical?: ClinicalData;
-  /* Fix: Added functional property to Evaluation */
-  functional?: FunctionalData;
+  anamnesis: {
+    medicalHistory: string;
+    medications: string;
+    allergies: string;
+    sleepQuality: string;
+    waterIntake: number;
+    isSmoker: boolean;
+    alcoholConsumption: string;
+    lifestyle: string;
+    injuries: string;
+  };
+  clinical: ClinicalData;
+  functional: FunctionalData;
+  somatotype: Somatotype;
   bodyFat: number;
   leanMass: number;
   fatMass: number;
@@ -103,41 +111,8 @@ export interface Evaluation {
   tdee: number;
   aiInsight?: string;
   notes: string;
-  weeklyGoals?: {
-    targetWeightLossPerWeek: number;
-  };
 }
 
-export interface Anamnesis {
-  medicalHistory: string;
-  medications: string;
-  allergies: string;
-  sleepQuality: string;
-  waterIntake: number;
-  isSmoker: boolean;
-  alcoholConsumption: string;
-  lifestyle: string;
-  injuries: string;
-}
-
-export enum PaymentStatus {
-  PAID = 'PAID',
-  PENDING = 'PENDING',
-  OVERDUE = 'OVERDUE'
-}
-
-export interface Payment {
-  id: string;
-  clientId: string;
-  clientName: string;
-  amount: number;
-  dueDate: string;
-  status: PaymentStatus;
-  planType: PlanType;
-  description: string;
-}
-
-/* Fix: Exported ExerciseStage to satisfy constants/exerciseLibrary.ts */
 export type ExerciseStage = 'Preparação' | 'Principal' | 'Finalização';
 
 export interface Exercise {
@@ -146,7 +121,6 @@ export interface Exercise {
   sets: string;
   reps: string;
   rest: string;
-  animationUrl?: string;
   stage?: ExerciseStage;
 }
 
@@ -167,8 +141,6 @@ export interface TrainingProgram {
 }
 
 export type ViewType = 'dashboard' | 'clients' | 'evaluations' | 'financial' | 'training' | 'settings';
-
-/* Fix: Exported WorkoutStatus to satisfy components/TrainingPrograms.tsx */
 export type WorkoutStatus = 'done' | 'scheduled' | 'canceled';
 
 export interface WorkoutLog {
@@ -178,8 +150,25 @@ export interface WorkoutLog {
   programTitle: string;
   date: string;
   status: WorkoutStatus;
-  notes?: string;
 }
+
+export enum PaymentStatus {
+  PAID = 'PAID',
+  PENDING = 'PENDING',
+  CANCELED = 'CANCELED'
+}
+
+export interface Payment {
+  id: string;
+  clientId: string;
+  clientName: string;
+  amount: number;
+  dueDate: string;
+  status: PaymentStatus;
+  planType: PlanType;
+  description: string;
+}
+
 export interface ExerciseTemplate {
   id: string;
   name: string;

@@ -25,7 +25,7 @@ const FinancialManagement: React.FC<FinancialManagementProps> = ({ clients, paym
       id: Math.random().toString(36).substr(2, 9),
       clientId: client.id,
       clientName: client.name,
-      amount: Number(formData.amount),
+      amount: parseFloat(formData.amount), // Garantindo conversão numérica
       dueDate: formData.dueDate,
       status: PaymentStatus.PENDING,
       planType: formData.planType,
@@ -38,8 +38,8 @@ const FinancialManagement: React.FC<FinancialManagementProps> = ({ clients, paym
     <div className="space-y-10">
       {/* Finance Overview */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-         <FinanceCard label="Faturamento Recebido" value={`R$ ${totalPaid.toLocaleString()}`} color="bg-emerald-50 text-emerald-600" icon="✔️" />
-         <FinanceCard label="Total a Receber" value={`R$ ${totalPending.toLocaleString()}`} color="bg-amber-50 text-amber-600" icon="⏳" />
+         <FinanceCard label="Faturamento Recebido" value={`R$ ${totalPaid.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} color="bg-emerald-50 text-emerald-600" icon="✔️" />
+         <FinanceCard label="Total a Receber" value={`R$ ${totalPending.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} color="bg-amber-50 text-amber-600" icon="⏳" />
          <div className="bg-slate-950 p-10 rounded-[3.5rem] flex flex-col items-center justify-center text-center shadow-2xl relative overflow-hidden group">
             <div className="absolute inset-0 bg-amber-400/10 opacity-0 group-hover:opacity-100 transition-opacity"></div>
             <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">Ações Financeiras</p>
@@ -51,7 +51,7 @@ const FinancialManagement: React.FC<FinancialManagementProps> = ({ clients, paym
          <div className="p-10 border-b border-slate-50 flex justify-between items-center bg-slate-50/50">
             <h4 className="font-black text-slate-900 text-xl tracking-tight uppercase">Fluxo de Caixa</h4>
             <div className="flex gap-2">
-               <button className="px-5 py-2 bg-white border border-slate-200 rounded-full text-[10px] font-black text-slate-400 uppercase">Exportar CSV</button>
+               <button className="px-5 py-2 bg-white border border-slate-200 rounded-full text-[10px] font-black text-slate-400 uppercase">Exportar Relatório</button>
             </div>
          </div>
          <div className="overflow-x-auto">
@@ -75,13 +75,13 @@ const FinancialManagement: React.FC<FinancialManagementProps> = ({ clients, paym
                         <td className="px-10 py-8">
                            <span className="bg-slate-100 text-slate-500 px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest">{p.planType}</span>
                         </td>
-                        <td className="px-10 py-8 text-xs font-bold text-slate-500">{new Date(p.dueDate).toLocaleDateString()}</td>
-                        <td className="px-10 py-8 font-black text-slate-900 text-base">R$ {p.amount.toLocaleString()}</td>
+                        <td className="px-10 py-8 text-xs font-bold text-slate-500">{new Date(p.dueDate).toLocaleDateString('pt-BR')}</td>
+                        <td className="px-10 py-8 font-black text-slate-900 text-base">R$ {p.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
                         <td className="px-10 py-8 text-right">
                            {p.status === PaymentStatus.PAID ? (
                               <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-5 py-2.5 rounded-2xl border border-emerald-100 uppercase tracking-widest">Liquidado</span>
                            ) : (
-                              <button onClick={() => onUpdateStatus(p.id, PaymentStatus.PAID)} className="bg-slate-900 text-white px-8 py-3 rounded-2xl font-black text-[9px] uppercase tracking-widest hover:bg-emerald-600 transition-all shadow-lg shadow-slate-200">Dar Baixa</button>
+                              <button onClick={() => onUpdateStatus(p.id, PaymentStatus.PAID)} className="bg-slate-900 text-white px-8 py-3 rounded-2xl font-black text-[9px] uppercase tracking-widest hover:bg-emerald-600 transition-all shadow-lg">Dar Baixa</button>
                            )}
                         </td>
                      </tr>
@@ -116,7 +116,7 @@ const FinancialManagement: React.FC<FinancialManagementProps> = ({ clients, paym
                   </div>
                   <div className="space-y-3">
                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Valor (R$)</label>
-                     <input type="number" className="w-full p-5 bg-slate-50 border-2 border-slate-100 rounded-[2rem] font-black text-xs outline-none focus:border-amber-400" value={formData.amount} onChange={e => setFormData({...formData, amount: e.target.value})} />
+                     <input type="number" step="0.01" className="w-full p-5 bg-slate-50 border-2 border-slate-100 rounded-[2rem] font-black text-xs outline-none focus:border-amber-400" value={formData.amount} onChange={e => setFormData({...formData, amount: e.target.value})} />
                   </div>
                </div>
                <button type="submit" className="w-full bg-slate-950 text-white py-6 rounded-[2rem] font-black text-xs uppercase tracking-widest shadow-2xl hover:bg-amber-400 hover:text-slate-950 transition-all">Confirmar Lançamento</button>

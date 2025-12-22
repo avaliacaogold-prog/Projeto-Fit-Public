@@ -25,9 +25,6 @@ export const getAIInsights = async (current: Evaluation, client: Client, history
     - Massa Magra: ${current.leanMass.toFixed(1)}kg
     - TDEE: ${current.tdee.toFixed(0)} kcal
     
-    METAS:
-    - Perda de peso alvo: ${current.weeklyGoals?.targetWeightLossPerWeek} kg/semana
-    
     Por favor, forneça uma análise de especialista resumida em português sobre o estado atual do cliente e recomendações imediatas.
   `;
 

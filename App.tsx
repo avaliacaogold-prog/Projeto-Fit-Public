@@ -125,9 +125,28 @@ const App: React.FC = () => {
         protocol: 'Pollock7',
         weight: 65,
         height: 168,
-        perimeters: { waist: 70, hips: 98, abdomen: 75, chest: 88, arm: 28, armFlexed: 30, neck: 32, shoulders: 102, thigh: 55, calf: 36 },
+        perimeters: { waist: 70, hips: 98, abdomen: 75, chest: 88, arm: 28, armFlexed: 30, forearm: 24, neck: 32, shoulders: 102, thigh: 55, thighProximal: 58, calf: 36 },
         skinfolds: { triceps: 12, biceps: 8, subscapular: 14, suprailiac: 16, abdominal: 18, chest: 10, thigh: 22, midaxillary: 12, calf: 14 },
         anamnesis: { medicalHistory: 'Nenhuma', medications: 'Nenhuma', allergies: 'Nenhuma', sleepQuality: 'Boa', waterIntake: 2.5, isSmoker: false, alcoholConsumption: 'Ocasional', lifestyle: 'Ativo', injuries: 'Leve desconforto no joelho esquerdo' },
+        // Fix: Added missing mandatory clinical, functional and somatotype fields for demo data
+        clinical: {
+          bloodPressure: '110/70',
+          restingHR: 62,
+          riskFactors: [],
+          acsmRiskStratification: 'Baixo'
+        },
+        functional: {
+          vo2Max: 45.2,
+          vo2Classification: 'Excelente',
+          vo2Protocol: 'Cooper',
+          testValue: 2400
+        },
+        somatotype: {
+          endomorphy: 3.2,
+          mesomorphy: 4.5,
+          ectomorphy: 2.8,
+          classification: 'Mesomorfo'
+        },
         bodyFat: 19.5,
         leanMass: 52.3,
         fatMass: 12.7,

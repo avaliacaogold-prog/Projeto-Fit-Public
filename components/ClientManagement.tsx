@@ -1,6 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { Client, Evaluation, TrainingSplit, TrainingProgram } from '../types';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 interface ClientManagementProps {
   clients: Client[];
@@ -17,7 +18,7 @@ const ClientManagement: React.FC<ClientManagementProps> = ({
   onAddClient, onUpdateClient, onDeleteClient, onViewTraining 
 }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [viewingClient, setViewingClient] = useState<Client | null>(null);
+  const [summaryClientId, setSummaryClientId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -37,6 +38,25 @@ const ClientManagement: React.FC<ClientManagementProps> = ({
     c.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
     c.email.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const summaryData = useMemo(() => {
+    if (!summaryClientId) return null;
+    const client = clients.find(c => c.id === summaryClientId);
+    const clientEvals = evaluations
+      .filter(e => e.clientId === summaryClientId)
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    const clientTraining = trainingPrograms.filter(p => p.clientId === summaryClientId);
+    
+    // Preparar dados para o gráfico de evolução
+    const chartData = clientEvals.map(e => ({
+      date: new Date(e.date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
+      weight: e.weight,
+      bf: e.bodyFat,
+      leanMass: e.leanMass
+    }));
+
+    return { client, clientEvals, clientTraining, chartData };
+  }, [summaryClientId, clients, evaluations, trainingPrograms]);
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
@@ -80,9 +100,13 @@ const ClientManagement: React.FC<ClientManagementProps> = ({
 
   const closeModal = () => { setIsModalOpen(false); setEditingClient(null); setErrors({}); };
 
+  const handlePrint = () => {
+    window.print();
+  };
+
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 no-print">
         <div className="relative w-full sm:w-96">
           <input
             type="text" placeholder="Buscar aluno pelo nome..."
@@ -99,8 +123,8 @@ const ClientManagement: React.FC<ClientManagementProps> = ({
         </button>
       </div>
 
-      <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-200 overflow-x-auto">
-        <table className="w-full text-left border-collapse min-w-[700px]">
+      <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-200 overflow-x-auto no-print">
+        <table className="w-full text-left border-collapse min-w-[800px]">
           <thead>
             <tr className="bg-slate-50 border-b border-slate-200">
               <th className="px-8 py-5 text-[10px] font-black text-slate-500 uppercase tracking-widest">Aluno</th>
@@ -142,6 +166,7 @@ const ClientManagement: React.FC<ClientManagementProps> = ({
                   </td>
                   <td className="px-8 py-5 text-right">
                     <div className="flex justify-end items-center gap-2">
+                      <button onClick={() => setSummaryClientId(client.id)} className="p-3 bg-slate-50 text-indigo-600 rounded-xl hover:bg-indigo-600 hover:text-white transition-all border border-slate-200" title="Resumo de Evolução">📈</button>
                       <button onClick={() => onViewTraining(client.id)} className="bg-indigo-50 text-indigo-700 px-4 py-2 rounded-xl font-black text-[9px] uppercase tracking-widest hover:bg-indigo-600 hover:text-white transition-all border border-indigo-100 shadow-sm">Treinos</button>
                       <button onClick={() => openModal(client)} className="p-3 bg-slate-50 text-slate-500 rounded-xl hover:bg-amber-500 hover:text-white transition-all border border-slate-200" title="Editar">✏️</button>
                       <button onClick={() => onDeleteClient(client.id)} className="p-3 bg-slate-50 text-rose-500 rounded-xl hover:bg-rose-500 hover:text-white transition-all border border-slate-200" title="Excluir">🗑️</button>
@@ -153,6 +178,151 @@ const ClientManagement: React.FC<ClientManagementProps> = ({
           </tbody>
         </table>
       </div>
+
+      {/* MODAL RESUMO DE EVOLUÇÃO (RELATÓRIO PDF) */}
+      {summaryClientId && summaryData && (
+        <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-xl z-[500] flex items-center justify-center p-4 print:p-0 print:static print:bg-white print:z-auto">
+          <div className="bg-white w-full max-w-5xl h-[92vh] rounded-[3.5rem] shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom duration-300 print:h-auto print:rounded-none print:shadow-none print:max-w-none">
+            <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50 no-print">
+               <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-indigo-600 text-white rounded-2xl flex items-center justify-center text-xl">📄</div>
+                  <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Relatório Consolidado de Evolução</h3>
+               </div>
+               <div className="flex gap-4">
+                  <button onClick={handlePrint} className="bg-slate-900 text-white px-8 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-indigo-600 transition-all shadow-lg">🖨️ Gerar PDF / Imprimir</button>
+                  <button onClick={() => setSummaryClientId(null)} className="text-slate-300 hover:text-rose-500 text-4xl leading-none">&times;</button>
+               </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-12 space-y-12 thin-scrollbar print:overflow-visible print:p-0">
+               {/* Header do Relatório Impresso */}
+               <div className="hidden print:flex justify-between items-start border-b-4 border-slate-900 pb-8 mb-12">
+                  <div>
+                    <h1 className="text-4xl font-black text-slate-900 uppercase leading-none mb-2">VITALMETRIC<span className="text-indigo-600">PRO</span></h1>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">Relatório Técnico de Evolução Antropométrica</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[10px] font-black text-slate-900 uppercase">{new Date().toLocaleDateString('pt-BR')}</p>
+                    <p className="text-[9px] font-bold text-slate-400">ID: {summaryData.client?.id.toUpperCase()}</p>
+                  </div>
+               </div>
+
+               {/* Dados do Aluno */}
+               <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                  <div className="bg-slate-50 p-8 rounded-[2rem] border border-slate-100 print:bg-white print:border-slate-200">
+                     <p className="text-[9px] font-black text-indigo-500 uppercase tracking-widest mb-2">Aluno</p>
+                     <h4 className="text-2xl font-black text-slate-900 leading-tight">{summaryData.client?.name}</h4>
+                     <p className="text-[10px] font-bold text-slate-400 mt-1 uppercase">{summaryData.client?.gender === 'M' ? 'Masculino' : 'Feminino'} | {summaryData.client?.birthDate}</p>
+                  </div>
+                  <div className="bg-slate-50 p-8 rounded-[2rem] border border-slate-100 print:bg-white print:border-slate-200">
+                     <p className="text-[9px] font-black text-indigo-500 uppercase tracking-widest mb-2">Prescrição</p>
+                     <h4 className="text-2xl font-black text-slate-900 leading-tight">{summaryData.client?.targetSplit}</h4>
+                     <p className="text-[10px] font-bold text-slate-400 mt-1 uppercase">{summaryData.client?.trainingFrequency} Sessões / Semana</p>
+                  </div>
+                  <div className="bg-slate-50 p-8 rounded-[2rem] border border-slate-100 print:bg-white print:border-slate-200">
+                     <p className="text-[9px] font-black text-indigo-500 uppercase tracking-widest mb-2">Status</p>
+                     <h4 className="text-2xl font-black text-slate-900 leading-tight">{summaryData.clientEvals.length}</h4>
+                     <p className="text-[10px] font-bold text-slate-400 mt-1 uppercase">Avaliações Realizadas</p>
+                  </div>
+               </div>
+
+               {/* Gráfico de Evolução */}
+               {summaryData.chartData.length > 1 ? (
+                 <div className="space-y-6">
+                    <h5 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-3">
+                       <div className="w-8 h-[2px] bg-indigo-600"></div> Curva de Progressão Antropométrica
+                    </h5>
+                    <div className="h-72 w-full bg-slate-50 rounded-[3rem] p-10 print:bg-white print:border print:border-slate-100">
+                       <ResponsiveContainer width="100%" height="100%">
+                          <AreaChart data={summaryData.chartData}>
+                             <defs>
+                                <linearGradient id="colorWeight" x1="0" y1="0" x2="0" y2="1">
+                                   <stop offset="5%" stopColor="#6366f1" stopOpacity={0.2}/>
+                                   <stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
+                                </linearGradient>
+                             </defs>
+                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                             <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{fontSize: 9, fontWeight: 800, fill: '#94a3b8'}} />
+                             <YAxis axisLine={false} tickLine={false} tick={{fontSize: 9, fontWeight: 800, fill: '#94a3b8'}} />
+                             <Tooltip contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }} />
+                             <Area type="monotone" dataKey="weight" stroke="#6366f1" strokeWidth={4} fill="url(#colorWeight)" name="Peso (kg)" />
+                             <Area type="monotone" dataKey="bf" stroke="#10b981" strokeWidth={4} fill="transparent" name="Gordura (%)" />
+                          </AreaChart>
+                       </ResponsiveContainer>
+                    </div>
+                 </div>
+               ) : (
+                 <div className="p-12 text-center bg-slate-50 rounded-[3rem] border-2 border-dashed border-slate-200 opacity-50">
+                    <p className="text-[10px] font-black uppercase text-slate-400">Gráfico de evolução requer ao menos 2 avaliações</p>
+                 </div>
+               )}
+
+               {/* Histórico de Medidas */}
+               <div className="space-y-6">
+                  <h5 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-3">
+                     <div className="w-8 h-[2px] bg-indigo-600"></div> Histórico de Resultados
+                  </h5>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left">
+                       <thead>
+                          <tr className="border-b border-slate-200">
+                             <th className="py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Data</th>
+                             <th className="py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Peso</th>
+                             <th className="py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Gordura (%)</th>
+                             <th className="py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Massa Magra</th>
+                             <th className="py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Abdômen</th>
+                          </tr>
+                       </thead>
+                       <tbody className="divide-y divide-slate-100">
+                          {summaryData.clientEvals.map(ev => (
+                             <tr key={ev.id}>
+                                <td className="py-5 font-black text-slate-800 text-xs">{new Date(ev.date).toLocaleDateString()}</td>
+                                <td className="py-5 font-bold text-slate-600 text-xs">{ev.weight} kg</td>
+                                <td className="py-5 font-bold text-slate-600 text-xs">{ev.bodyFat.toFixed(1)}%</td>
+                                <td className="py-5 font-bold text-slate-600 text-xs">{ev.leanMass.toFixed(1)} kg</td>
+                                <td className="py-5 font-bold text-slate-600 text-xs">{ev.perimeters.abdomen || ev.perimeters.waist || '---'} cm</td>
+                             </tr>
+                          ))}
+                       </tbody>
+                    </table>
+                  </div>
+               </div>
+
+               {/* Treinos Ativos */}
+               <div className="space-y-6 break-before-page">
+                  <h5 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-3">
+                     <div className="w-8 h-[2px] bg-indigo-600"></div> Planejamento de Treino Ativo
+                  </h5>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                     {summaryData.clientTraining.map(train => (
+                        <div key={train.id} className="p-8 bg-white border border-slate-100 rounded-[2.5rem] shadow-sm print:border-slate-200">
+                           <div className="flex items-center gap-4 mb-4">
+                              <span className="bg-indigo-600 text-white px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest">{train.splitLetter}</span>
+                              <h6 className="text-lg font-black text-slate-800 leading-none">{train.title}</h6>
+                           </div>
+                           <p className="text-[10px] text-slate-400 font-bold uppercase mb-4">{train.exercises.length} Exercícios Prescritos</p>
+                           <ul className="space-y-2">
+                              {train.exercises.slice(0, 5).map((ex, i) => (
+                                 <li key={i} className="flex justify-between items-center text-[11px] border-b border-slate-50 pb-2 last:border-0">
+                                    <span className="font-black text-slate-700">{ex.name}</span>
+                                    <span className="text-slate-400 font-bold">{ex.sets}x{ex.reps}</span>
+                                 </li>
+                              ))}
+                              {train.exercises.length > 5 && <li className="text-[9px] text-indigo-500 font-black uppercase italic">+ {train.exercises.length - 5} exercícios adicionais na ficha</li>}
+                           </ul>
+                        </div>
+                     ))}
+                     {summaryData.clientTraining.length === 0 && (
+                        <div className="col-span-2 p-12 text-center bg-slate-50 rounded-[3rem] border-2 border-dashed border-slate-200 opacity-50">
+                           <p className="text-[10px] font-black uppercase text-slate-400">Nenhum programa de treino registrado</p>
+                        </div>
+                     )}
+                  </div>
+               </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {isModalOpen && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[100] flex items-center justify-center p-4">

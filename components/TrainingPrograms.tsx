@@ -49,6 +49,7 @@ const TrainingPrograms: React.FC<TrainingProgramsProps> = ({
   });
   const [exercises, setExercises] = useState<Exercise[]>([]);
   const [showLibrary, setShowLibrary] = useState(false);
+  const [librarySearch, setLibrarySearch] = useState('');
 
   const currentClient = useMemo(() => clients.find(c => c.id === selectedClientId), [clients, selectedClientId]);
 
@@ -61,6 +62,14 @@ const TrainingPrograms: React.FC<TrainingProgramsProps> = ({
   const filteredLogs = useMemo(() => {
     return workoutLogs.filter(l => l.clientId === selectedClientId);
   }, [workoutLogs, selectedClientId]);
+
+  const filteredLibrary = useMemo(() => {
+    const search = librarySearch.toLowerCase();
+    return EXERCISE_LIBRARY.filter(ex => 
+      ex.name.toLowerCase().includes(search) || 
+      ex.category.toLowerCase().includes(search)
+    );
+  }, [librarySearch]);
 
   const weekDays = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
   const monthNames = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
@@ -126,7 +135,6 @@ const TrainingPrograms: React.FC<TrainingProgramsProps> = ({
     });
   };
 
-  // Fix: Added missing handleSaveProgram function to save or update training programs
   const handleSaveProgram = () => {
     if (!selectedClientId) return alert("Selecione um aluno.");
     if (!formData.title) return alert("Defina um título para o treino.");
@@ -153,6 +161,20 @@ const TrainingPrograms: React.FC<TrainingProgramsProps> = ({
     }
 
     setIsModalOpen(false);
+  };
+
+  const addFromLibrary = (libEx: LibraryExercise) => {
+    const newEx: Exercise = {
+      id: Math.random().toString(36).substr(2, 9),
+      name: libEx.name,
+      sets: '3',
+      reps: '12',
+      rest: '60s',
+      stage: libEx.defaultStage
+    };
+    setExercises([...exercises, newEx]);
+    setShowLibrary(false);
+    setLibrarySearch('');
   };
 
   const navigate = (amount: number) => {
@@ -440,7 +462,7 @@ const TrainingPrograms: React.FC<TrainingProgramsProps> = ({
         </div>
       )}
 
-      {/* MODAL EDITOR DE TREINO (PRESERVADO) */}
+      {/* MODAL EDITOR DE TREINO */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-slate-900/95 backdrop-blur-xl z-[200] flex items-center justify-center p-4">
           <div className="bg-white w-full max-w-6xl h-[92vh] rounded-[3.5rem] shadow-2xl flex flex-col overflow-hidden animate-in zoom-in duration-300 border border-white/20">
@@ -477,31 +499,136 @@ const TrainingPrograms: React.FC<TrainingProgramsProps> = ({
                     </div>
                     <textarea placeholder="Observações e métodos..." className="w-full p-5 bg-white border border-slate-200 rounded-2xl font-bold text-xs outline-none min-h-[140px]" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} />
                   </div>
-               </div>
-               <div className="flex-1 p-10 overflow-y-auto bg-white thin-scrollbar">
-                  <div className="space-y-5">
-                    {exercises.length === 0 ? (
-                      <div className="h-96 flex flex-col items-center justify-center text-center opacity-20">
-                         <span className="text-7xl mb-6">🖋️</span>
-                         <p className="text-sm font-black uppercase tracking-[0.3em]">Nenhum exercício prescrito</p>
-                      </div>
-                    ) : (
-                      exercises.map((ex, idx) => (
-                        <div key={ex.id} className="bg-slate-50/50 border border-slate-100 p-8 rounded-[2.5rem] flex flex-col items-center gap-8 group hover:border-indigo-200 transition-all animate-in slide-in-from-left">
-                           <div className="flex items-center gap-6 w-full">
-                              <div className="w-10 h-10 bg-slate-900 text-white rounded-2xl flex items-center justify-center font-black text-xs">{idx + 1}</div>
-                              <input type="text" className="flex-1 bg-transparent font-black text-slate-800 text-lg outline-none" value={ex.name} onChange={e => setExercises(exercises.map(item => item.id === ex.id ? { ...item, name: e.target.value } : item))} />
-                              <button onClick={() => setExercises(exercises.filter(item => item.id !== ex.id))} className="p-3 text-slate-300 hover:text-rose-500 transition-colors">🗑️</button>
-                           </div>
-                        </div>
-                      ))
-                    )}
+                  <div className="pt-6 border-t border-slate-200">
+                    <button onClick={() => setShowLibrary(!showLibrary)} className="w-full py-4 bg-indigo-50 text-indigo-600 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-indigo-100 transition-all flex items-center justify-center gap-2">
+                      📚 Biblioteca de Exercícios
+                    </button>
                   </div>
+               </div>
+               <div className="flex-1 p-10 overflow-y-auto bg-white thin-scrollbar relative">
+                  {showLibrary ? (
+                    <div className="space-y-6 animate-in fade-in slide-in-from-right">
+                       <div className="flex justify-between items-center mb-6">
+                          <h4 className="text-sm font-black text-slate-800 uppercase tracking-tight">Explorar Biblioteca Técnica</h4>
+                          <button onClick={() => setShowLibrary(false)} className="text-[10px] font-black text-rose-500 uppercase tracking-widest border border-rose-100 px-4 py-2 rounded-xl hover:bg-rose-50">Cancelar</button>
+                       </div>
+                       <input 
+                         type="text" 
+                         placeholder="Pesquisar por nome ou categoria (ex: Pernas)..." 
+                         className="w-full p-5 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-xs outline-none mb-8 focus:ring-2 focus:ring-indigo-500 transition-all"
+                         value={librarySearch}
+                         onChange={e => setLibrarySearch(e.target.value)}
+                       />
+                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {filteredLibrary.map(libEx => (
+                            <button 
+                              key={libEx.name}
+                              onClick={() => addFromLibrary(libEx)}
+                              className="p-6 bg-white border border-slate-100 rounded-[2rem] text-left hover:border-indigo-400 hover:shadow-xl transition-all flex items-center gap-5 group"
+                            >
+                               <div className="w-14 h-14 bg-slate-50 rounded-2xl flex items-center justify-center text-3xl group-hover:scale-110 transition-transform">{libEx.icon}</div>
+                               <div className="flex-1">
+                                  <p className="font-black text-slate-800 text-sm leading-tight">{libEx.name}</p>
+                                  <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-1">{libEx.category}</p>
+                               </div>
+                               <div className="text-indigo-400 opacity-0 group-hover:opacity-100 transition-opacity font-black text-xl">+</div>
+                            </button>
+                          ))}
+                          {filteredLibrary.length === 0 && (
+                            <div className="col-span-full py-20 text-center opacity-20">
+                               <p className="text-xs font-black uppercase tracking-widest">Nenhum exercício encontrado</p>
+                            </div>
+                          )}
+                       </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-5">
+                      {exercises.length === 0 ? (
+                        <div className="h-96 flex flex-col items-center justify-center text-center opacity-20">
+                           <span className="text-7xl mb-6">🖋️</span>
+                           <p className="text-sm font-black uppercase tracking-[0.3em]">Nenhum exercício prescrito</p>
+                           <p className="text-[10px] font-bold mt-2">Utilize a biblioteca lateral para adicionar movimentos</p>
+                        </div>
+                      ) : (
+                        exercises.map((ex, idx) => (
+                          <div key={ex.id} className="bg-slate-50/50 border border-slate-100 p-8 rounded-[2.5rem] flex flex-col gap-8 group hover:border-indigo-200 transition-all animate-in slide-in-from-left">
+                             <div className="flex items-center gap-6 w-full">
+                                <div className="w-10 h-10 bg-slate-900 text-white rounded-2xl flex items-center justify-center font-black text-xs">{idx + 1}</div>
+                                <input type="text" className="flex-1 bg-transparent font-black text-slate-800 text-lg outline-none" value={ex.name} onChange={e => setExercises(exercises.map(item => item.id === ex.id ? { ...item, name: e.target.value } : item))} />
+                                <div className="flex items-center gap-3">
+                                  <select className="bg-white border border-slate-200 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest" value={ex.stage} onChange={e => setExercises(exercises.map(item => item.id === ex.id ? { ...item, stage: e.target.value as ExerciseStage } : item))}>
+                                     <option value="Preparação">Prep</option>
+                                     <option value="Principal">Base</option>
+                                     <option value="Finalização">Fim</option>
+                                  </select>
+                                  <button onClick={() => setExercises(exercises.filter(item => item.id !== ex.id))} className="p-3 text-slate-300 hover:text-rose-500 transition-colors">🗑️</button>
+                                </div>
+                             </div>
+                             <div className="grid grid-cols-3 gap-6">
+                                <div>
+                                   <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 block ml-2">Séries</label>
+                                   <input type="text" className="w-full bg-white border border-slate-200 p-4 rounded-2xl font-bold text-sm text-center" value={ex.sets} onChange={e => setExercises(exercises.map(item => item.id === ex.id ? { ...item, sets: e.target.value } : item))} />
+                                </div>
+                                <div>
+                                   <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 block ml-2">Repetições</label>
+                                   <input type="text" className="w-full bg-white border border-slate-200 p-4 rounded-2xl font-bold text-sm text-center" value={ex.reps} onChange={e => setExercises(exercises.map(item => item.id === ex.id ? { ...item, reps: e.target.value } : item))} />
+                                </div>
+                                <div>
+                                   <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 block ml-2">Descanso</label>
+                                   <input type="text" className="w-full bg-white border border-slate-200 p-4 rounded-2xl font-bold text-sm text-center" value={ex.rest} onChange={e => setExercises(exercises.map(item => item.id === ex.id ? { ...item, rest: e.target.value } : item))} />
+                                </div>
+                             </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  )}
                </div>
             </div>
             <div className="p-8 bg-slate-50 border-t border-slate-100 flex justify-end gap-4">
                <button onClick={handleSaveProgram} className="px-14 py-6 bg-slate-950 text-white rounded-[2rem] font-black text-[11px] uppercase tracking-widest shadow-2xl hover:bg-indigo-600 transition-all flex items-center gap-4">💾 Publicar Ficha de Treino</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* DETALHES DO TREINO (MODAL) */}
+      {detailsProgram && (
+        <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-xl z-[300] flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-4xl max-h-[90vh] rounded-[3.5rem] shadow-2xl overflow-hidden flex flex-col animate-in zoom-in duration-300">
+             <div className="p-10 border-b flex justify-between items-center bg-slate-50">
+                <div className="flex items-center gap-4">
+                   <span className="bg-indigo-600 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest">Treino {detailsProgram.splitLetter}</span>
+                   <h3 className="text-2xl font-black text-slate-900 uppercase">{detailsProgram.title}</h3>
+                </div>
+                <button onClick={() => setDetailsProgram(null)} className="text-4xl text-slate-300 hover:text-rose-500">&times;</button>
+             </div>
+             <div className="p-10 overflow-y-auto thin-scrollbar space-y-8">
+                {(['Preparação', 'Principal', 'Finalização'] as ExerciseStage[]).map(stage => {
+                  const stageExercises = detailsProgram.exercises.filter(ex => ex.stage === stage);
+                  if (stageExercises.length === 0) return null;
+                  return (
+                    <div key={stage} className="space-y-4">
+                       <h5 className={`text-[10px] font-black uppercase tracking-widest px-4 py-1 rounded-lg w-fit ${stage === 'Preparação' ? 'bg-amber-100 text-amber-600' : stage === 'Principal' ? 'bg-indigo-100 text-indigo-600' : 'bg-emerald-100 text-emerald-600'}`}>{stage}</h5>
+                       <div className="grid grid-cols-1 gap-4">
+                          {stageExercises.map(ex => (
+                            <div key={ex.id} className="bg-slate-50 p-6 rounded-[2rem] flex justify-between items-center border border-slate-100">
+                               <div>
+                                  <p className="font-black text-slate-800 text-sm">{ex.name}</p>
+                                  <div className="flex gap-4 mt-1">
+                                     <span className="text-[9px] font-bold text-slate-400 uppercase">Sets: {ex.sets}</span>
+                                     <span className="text-[9px] font-bold text-slate-400 uppercase">Reps: {ex.reps}</span>
+                                     <span className="text-[9px] font-bold text-slate-400 uppercase">Rest: {ex.rest}</span>
+                                  </div>
+                               </div>
+                               <div className="text-lg opacity-20">⚙️</div>
+                            </div>
+                          ))}
+                       </div>
+                    </div>
+                  );
+                })}
+             </div>
           </div>
         </div>
       )}
