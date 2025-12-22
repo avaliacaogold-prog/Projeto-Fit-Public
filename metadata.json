@@ -1,0 +1,7 @@
+{
+  "name": "phgg",
+  "description": "Uma plataforma completa para personal trainers e profissionais de saúde gerenciarem avaliações físicas, prontuários de clientes e controle financeiro de recebimentos com inteligência artificial.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}

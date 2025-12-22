@@ -1,0 +1,496 @@
+
+import React, { useState, useMemo, useEffect } from 'react';
+import { TrainingProgram, Exercise, Client, TrainingLevel, WorkoutLog, WorkoutStatus, ExerciseTemplate, Evaluation, TrainingSplit, ExerciseStage } from '../types';
+import { EXERCISE_LIBRARY, LibraryExercise } from '../constants/exerciseLibrary';
+
+interface TrainingProgramsProps {
+  clients: Client[];
+  evaluations: Evaluation[];
+  programs: TrainingProgram[];
+  workoutLogs: WorkoutLog[];
+  exerciseTemplates: ExerciseTemplate[];
+  onAddProgram: (program: TrainingProgram) => void;
+  onUpdateProgram: (program: TrainingProgram) => void;
+  onDeleteProgram: (id: string) => void;
+  onUpdateLog: (log: WorkoutLog) => void;
+  onBulkAddLogs: (logs: WorkoutLog[]) => void;
+  onDeleteLog: (id: string) => void;
+  onAddTemplate: (template: ExerciseTemplate) => void;
+  onDeleteTemplate: (id: string) => void;
+  initialClientId?: string | null;
+}
+
+type AgendaView = 'weekly' | 'monthly' | 'annual';
+
+const TrainingPrograms: React.FC<TrainingProgramsProps> = ({ 
+  clients, programs, workoutLogs, 
+  onAddProgram, onUpdateProgram, onDeleteProgram, onUpdateLog, onBulkAddLogs, onDeleteLog, 
+  initialClientId 
+}) => {
+  const [activeTab, setActiveTab] = useState<'programs' | 'calendar'>('programs');
+  const [agendaView, setAgendaView] = useState<AgendaView>('weekly');
+  const [selectedClientId, setSelectedClientId] = useState(initialClientId || '');
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingProgramId, setEditingProgramId] = useState<string | null>(null);
+  const [detailsProgram, setDetailsProgram] = useState<TrainingProgram | null>(null);
+  
+  const [viewDate, setViewDate] = useState(new Date());
+  const [libraryLevelFilter, setLibraryLevelFilter] = useState<TrainingLevel | 'Todos'>('Todos');
+  const [libraryStageFilter, setLibraryStageFilter] = useState<ExerciseStage | 'Todos'>('Todos');
+
+  const [isAutoPopulateOpen, setIsAutoPopulateOpen] = useState(false);
+  const [autoPopulateData, setAutoPopulateData] = useState({
+    startDate: new Date().toISOString().split('T')[0],
+    endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    trainingDays: [1, 2, 3, 4, 5], 
+    sequence: [] as string[]
+  });
+
+  const [formData, setFormData] = useState({ 
+    title: '', level: 'Iniciante' as TrainingLevel, 
+    splitType: 'ABC' as TrainingSplit, splitLetter: 'A', description: '' 
+  });
+  const [exercises, setExercises] = useState<Exercise[]>([]);
+  const [showLibrary, setShowLibrary] = useState(false);
+
+  const currentClient = useMemo(() => clients.find(c => c.id === selectedClientId), [clients, selectedClientId]);
+
+  const clientPrograms = useMemo(() => {
+    return programs
+      .filter(p => p.clientId === selectedClientId)
+      .sort((a, b) => (a.splitLetter || 'A').localeCompare(b.splitLetter || 'A'));
+  }, [programs, selectedClientId]);
+
+  const filteredLogs = useMemo(() => {
+    return workoutLogs.filter(l => l.clientId === selectedClientId);
+  }, [workoutLogs, selectedClientId]);
+
+  const weekDays = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo'];
+
+  // Formatação de data segura para evitar problemas de fuso horário
+  const formatDateSafe = (date: Date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const handleAutoPopulate = () => {
+    if (!selectedClientId) return alert("Selecione um aluno primeiro.");
+    if (autoPopulateData.sequence.length === 0) return alert("Selecione a sequência dos treinos (ex: clique em A, depois em B).");
+
+    const start = new Date(autoPopulateData.startDate + 'T12:00:00'); // Meio-dia para evitar shifts
+    const end = new Date(autoPopulateData.endDate + 'T12:00:00');
+    
+    if (start > end) return alert("A data de início deve ser anterior à data de término.");
+
+    let currentDate = new Date(start);
+    let sequenceIndex = 0;
+    const newLogs: WorkoutLog[] = [];
+
+    while (currentDate <= end) {
+      const dayOfWeek = currentDate.getDay(); // 0 = Dom, 1 = Seg...
+      if (autoPopulateData.trainingDays.includes(dayOfWeek)) {
+        const programId = autoPopulateData.sequence[sequenceIndex % autoPopulateData.sequence.length];
+        const program = programs.find(p => p.id === programId);
+        
+        if (program) {
+          newLogs.push({
+            id: Math.random().toString(36).substr(2, 9),
+            clientId: selectedClientId,
+            programId: program.id,
+            programTitle: `Treino ${program.splitLetter}`,
+            date: formatDateSafe(currentDate),
+            status: 'scheduled'
+          });
+          sequenceIndex++;
+        }
+      }
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
+    
+    if (newLogs.length > 0) {
+      onBulkAddLogs(newLogs);
+      alert(`${newLogs.length} treinos agendados com sucesso!`);
+      setIsAutoPopulateOpen(false);
+    } else {
+      alert("Nenhum dia de treino compatível encontrado no período. Verifique os dias da semana selecionados.");
+    }
+  };
+
+  const handleScheduleWorkout = (dateStr: string, programId: string) => {
+    const program = programs.find(p => p.id === programId);
+    if (!program) return;
+    onUpdateLog({
+      id: Math.random().toString(36).substr(2, 9),
+      clientId: selectedClientId,
+      programId: program.id,
+      programTitle: `Treino ${program.splitLetter}`,
+      date: dateStr,
+      status: 'scheduled'
+    });
+  };
+
+  const navigate = (amount: number) => {
+    const next = new Date(viewDate);
+    if (agendaView === 'weekly') next.setDate(next.getDate() + (amount * 7));
+    else if (agendaView === 'monthly') next.setMonth(next.getMonth() + amount);
+    else next.setFullYear(next.getFullYear() + amount);
+    setViewDate(next);
+  };
+
+  const addExerciseFromLibrary = (libEx: LibraryExercise) => {
+    const newEx: Exercise = {
+      id: Math.random().toString(36).substr(2, 9),
+      name: libEx.name,
+      sets: '3',
+      reps: '12',
+      rest: '60',
+      stage: libEx.defaultStage,
+      animationUrl: 'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExNHJid3M5bnR4Z2d4Z2d4Z2d4Z2d4Z2d4Z2d4Z2d4ZyZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/3o7TKMG8LhYJ4O5pG8/giphy.gif'
+    };
+    setExercises(prev => [...prev, newEx]);
+  };
+
+  const handleSaveProgram = () => {
+    if (!selectedClientId) return;
+    const programData: TrainingProgram = {
+      id: editingProgramId || Math.random().toString(36).substr(2, 9),
+      clientId: selectedClientId,
+      clientName: currentClient?.name || '',
+      ...formData,
+      exercises,
+      createdAt: new Date().toISOString()
+    };
+    if (editingProgramId) onUpdateProgram(programData);
+    else onAddProgram(programData);
+    setIsModalOpen(false);
+  };
+
+  const filteredLibrary = useMemo(() => {
+    return EXERCISE_LIBRARY.filter(ex => {
+      const matchLevel = libraryLevelFilter === 'Todos' || ex.recommendedLevels.includes(libraryLevelFilter as TrainingLevel);
+      const matchStage = libraryStageFilter === 'Todos' || ex.defaultStage === libraryStageFilter;
+      return matchLevel && matchStage;
+    });
+  }, [libraryLevelFilter, libraryStageFilter]);
+
+  return (
+    <div className="space-y-8">
+      {/* Header Prescrição */}
+      <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm flex flex-col md:flex-row justify-between items-center gap-6 no-print">
+        <div>
+          <h2 className="text-xl font-black text-slate-800 uppercase tracking-tight">Prescrição & Planejamento</h2>
+          <div className="flex bg-slate-100 p-1 rounded-xl mt-3">
+            <button onClick={() => setActiveTab('programs')} className={`px-6 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'programs' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400'}`}>Fichas Técnicas</button>
+            <button onClick={() => setActiveTab('calendar')} className={`px-6 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'calendar' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400'}`}>Agenda Científica</button>
+          </div>
+        </div>
+        <select 
+          className="w-full md:w-72 px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-xs outline-none focus:ring-2 focus:ring-indigo-500"
+          value={selectedClientId}
+          onChange={(e) => setSelectedClientId(e.target.value)}
+        >
+          <option value="">Selecione o Aluno...</option>
+          {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+        </select>
+      </div>
+
+      {activeTab === 'programs' && (
+        <div className="space-y-6 animate-in fade-in duration-500">
+          <div className="flex justify-between items-center">
+            <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em]">Programas Prescritos</h3>
+            <button 
+              onClick={() => { 
+                if(!selectedClientId) return alert("Selecione um aluno.");
+                setEditingProgramId(null);
+                setFormData({ title: '', level: 'Iniciante', splitType: 'ABC', splitLetter: 'A', description: '' });
+                setExercises([]);
+                setIsModalOpen(true);
+              }}
+              className="bg-indigo-600 text-white px-8 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-lg"
+            >
+              + Novo Treino
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {clientPrograms.map(p => (
+              <div key={p.id} className="bg-white rounded-[2.5rem] border border-slate-200 overflow-hidden group hover:border-indigo-500 transition-all flex flex-col">
+                <div className="p-8 bg-slate-50/50 flex justify-between items-start">
+                  <div>
+                    <span className="bg-indigo-100 text-indigo-600 px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest">Treino {p.splitLetter}</span>
+                    <h4 className="text-xl font-black text-slate-800 mt-3">{p.title}</h4>
+                  </div>
+                  <div className="flex gap-2">
+                    <button onClick={() => { 
+                      setEditingProgramId(p.id); 
+                      setFormData({ title: p.title, level: p.level, splitType: p.splitType || 'ABC', splitLetter: p.splitLetter || 'A', description: p.description }); 
+                      setExercises(p.exercises); 
+                      setIsModalOpen(true); 
+                    }} className="p-3 bg-white rounded-xl border border-slate-200 text-slate-400 hover:text-indigo-600 transition-colors">✏️</button>
+                    <button onClick={() => onDeleteProgram(p.id)} className="p-3 bg-white rounded-xl border border-slate-200 text-slate-400 hover:text-rose-500 transition-colors">🗑️</button>
+                  </div>
+                </div>
+                <div className="p-8 flex-1">
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-6">{p.exercises.length} Exercícios</p>
+                  <button onClick={() => setDetailsProgram(p)} className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-indigo-600 transition-all">Ver Detalhes</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'calendar' && (
+        <div className="animate-in fade-in duration-500 space-y-6">
+          <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm no-print">
+            <div className="flex bg-slate-50 p-1 rounded-xl">
+               {(['weekly', 'monthly', 'annual'] as AgendaView[]).map(v => (
+                 <button key={v} onClick={() => { setAgendaView(v); setViewDate(new Date()); }} className={`px-5 py-2 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${agendaView === v ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400'}`}>{v === 'weekly' ? 'Semana' : v === 'monthly' ? 'Mês' : 'Ano'}</button>
+               ))}
+            </div>
+            <div className="flex items-center gap-4 bg-slate-50 px-6 py-2 rounded-2xl">
+               <button onClick={() => navigate(-1)} className="p-2 text-slate-400 hover:text-indigo-600 font-black">←</button>
+               <span className="text-[10px] font-black uppercase tracking-widest text-slate-600 min-w-[120px] text-center">
+                 {agendaView === 'weekly' && `Semana de ${viewDate.toLocaleDateString('pt-BR', {day: 'numeric', month: 'short'})}`}
+                 {agendaView === 'monthly' && viewDate.toLocaleDateString('pt-BR', {month: 'long', year: 'numeric'})}
+                 {agendaView === 'annual' && viewDate.getFullYear()}
+               </span>
+               <button onClick={() => navigate(1)} className="p-2 text-slate-400 hover:text-indigo-600 font-black">→</button>
+            </div>
+            <button onClick={() => setIsAutoPopulateOpen(true)} className="bg-emerald-50 text-emerald-600 px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-100 transition-all border border-emerald-100">⚙️ Preenchimento Automático</button>
+          </div>
+
+          {agendaView === 'weekly' && (
+            <div className="grid grid-cols-1 md:grid-cols-7 gap-4">
+              {weekDays.map((day, idx) => {
+                const today = new Date();
+                const firstDayOfWeek = new Date(viewDate);
+                const dayOffset = (viewDate.getDay() === 0 ? 6 : viewDate.getDay() - 1);
+                firstDayOfWeek.setDate(viewDate.getDate() - dayOffset);
+                const targetDate = new Date(firstDayOfWeek);
+                targetDate.setDate(firstDayOfWeek.getDate() + idx);
+                const dateStr = formatDateSafe(targetDate);
+                const logsForDay = filteredLogs.filter(l => l.date === dateStr);
+                
+                return (
+                  <div key={day} className={`bg-white rounded-3xl border ${targetDate.toDateString() === today.toDateString() ? 'border-indigo-300 ring-4 ring-indigo-50' : 'border-slate-200'} p-6 flex flex-col min-h-[350px]`}>
+                    <div className="flex justify-between items-start mb-4">
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{day}</p>
+                      <span className="text-[9px] font-bold text-slate-300">{targetDate.getDate()}/{targetDate.getMonth()+1}</span>
+                    </div>
+                    <div className="flex-1 space-y-3">
+                      {logsForDay.map(log => (
+                        <div key={log.id} className="bg-indigo-50 border border-indigo-100 p-4 rounded-2xl relative group animate-in slide-in-from-top">
+                          <p className="text-[10px] font-black text-indigo-700 uppercase leading-tight">{log.programTitle}</p>
+                          <button onClick={() => onDeleteLog(log.id)} className="absolute -top-2 -right-2 w-6 h-6 bg-rose-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-xs shadow-lg">×</button>
+                        </div>
+                      ))}
+                    </div>
+                    <select className="mt-4 w-full p-2 bg-slate-50 border border-slate-100 rounded-xl text-[9px] font-black uppercase outline-none focus:border-indigo-400" onChange={(e) => { if(e.target.value) handleScheduleWorkout(dateStr, e.target.value); e.target.value = ''; }} defaultValue=""><option value="" disabled>+ Prescrever</option>{clientPrograms.map(p => <option key={p.id} value={p.id}>{p.splitLetter} - {p.title}</option>)}</select>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* MODAL AUTO-POPULATE */}
+      {isAutoPopulateOpen && (
+        <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-xl z-[250] flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-2xl rounded-[3rem] shadow-2xl overflow-hidden animate-in slide-in-from-bottom flex flex-col">
+             <div className="p-10 border-b bg-slate-50 flex justify-between items-center">
+                <h3 className="text-2xl font-black text-slate-900 uppercase">Gerador de Ciclo</h3>
+                <button onClick={() => setIsAutoPopulateOpen(false)} className="text-4xl text-slate-300">&times;</button>
+             </div>
+             <div className="p-10 space-y-8 max-h-[70vh] overflow-y-auto thin-scrollbar">
+                <div className="grid grid-cols-2 gap-6">
+                   <div>
+                      <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block">Início do Ciclo</label>
+                      <input type="date" className="w-full p-5 bg-slate-50 rounded-2xl font-bold" value={autoPopulateData.startDate} onChange={e => setAutoPopulateData({...autoPopulateData, startDate: e.target.value})} />
+                   </div>
+                   <div>
+                      <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block">Término do Ciclo</label>
+                      <input type="date" className="w-full p-5 bg-slate-50 rounded-2xl font-bold" value={autoPopulateData.endDate} onChange={e => setAutoPopulateData({...autoPopulateData, endDate: e.target.value})} />
+                   </div>
+                </div>
+                <div>
+                   <label className="text-[10px] font-black uppercase text-slate-400 mb-4 block">Dias de Treino na Semana</label>
+                   <div className="flex gap-2">
+                      {weekDays.map((d, i) => {
+                         const dayNum = i === 6 ? 0 : i + 1;
+                         return (
+                            <button key={d} onClick={() => {
+                               const days = autoPopulateData.trainingDays.includes(dayNum) ? autoPopulateData.trainingDays.filter(x => x !== dayNum) : [...autoPopulateData.trainingDays, dayNum];
+                               setAutoPopulateData({...autoPopulateData, trainingDays: days});
+                            }} className={`flex-1 py-4 rounded-xl text-[9px] font-black uppercase ${autoPopulateData.trainingDays.includes(dayNum) ? 'bg-indigo-600 text-white shadow-lg' : 'bg-slate-50 text-slate-400'}`}>{d.substring(0,3)}</button>
+                         );
+                      })}
+                   </div>
+                </div>
+                <div className="space-y-4">
+                   <p className="text-[10px] font-black uppercase text-slate-400">Sequência do Split (Clique na ordem desejada)</p>
+                   <div className="flex flex-wrap gap-3">
+                      {clientPrograms.map(p => (
+                         <button key={p.id} onClick={() => setAutoPopulateData({...autoPopulateData, sequence: [...autoPopulateData.sequence, p.id]})} className="bg-white border p-4 rounded-2xl flex items-center gap-3 hover:border-indigo-500 transition-all"><span className="w-6 h-6 bg-slate-100 rounded flex items-center justify-center text-[10px] font-black">{p.splitLetter}</span>{p.title}</button>
+                      ))}
+                   </div>
+                   {autoPopulateData.sequence.length > 0 && (
+                     <div className="p-6 bg-indigo-50 rounded-[2rem] border border-indigo-100">
+                        <p className="text-[9px] font-black text-indigo-400 uppercase mb-3">Ciclo atual:</p>
+                        <div className="flex flex-wrap gap-2">
+                           {autoPopulateData.sequence.map((id, idx) => {
+                              const p = programs.find(item => item.id === id);
+                              return (
+                                <div key={idx} className="bg-white px-3 py-1 rounded-lg border border-indigo-200 text-[10px] font-black text-indigo-600">
+                                   {p?.splitLetter || '?'}
+                                </div>
+                              );
+                           })}
+                           <button onClick={() => setAutoPopulateData({...autoPopulateData, sequence: []})} className="text-rose-500 font-black text-[9px] uppercase hover:underline ml-auto">Limpar Ordem</button>
+                        </div>
+                     </div>
+                   )}
+                </div>
+             </div>
+             <div className="p-10 border-t bg-slate-50 flex justify-end gap-6">
+                <button onClick={handleAutoPopulate} className="bg-slate-900 text-white px-12 py-5 rounded-[2rem] font-black text-[10px] uppercase shadow-2xl hover:bg-indigo-600 transition-all">Publicar Agenda em Massa</button>
+             </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL EDITOR DE TREINO (PRESERVADO) */}
+      {isModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/95 backdrop-blur-xl z-[200] flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-6xl h-[92vh] rounded-[3.5rem] shadow-2xl flex flex-col overflow-hidden animate-in zoom-in duration-300 border border-white/20">
+            <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+               <div className="flex items-center gap-6">
+                  <div className="w-14 h-14 bg-indigo-600 rounded-[1.5rem] flex items-center justify-center text-2xl">📋</div>
+                  <div>
+                    <h3 className="text-2xl font-black text-slate-800 uppercase tracking-tight">{editingProgramId ? 'Aprimorar Ficha' : 'Nova Prescrição Científica'}</h3>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">{currentClient?.name}</p>
+                  </div>
+               </div>
+               <button onClick={() => setIsModalOpen(false)} className="text-slate-300 hover:text-rose-500 text-5xl">&times;</button>
+            </div>
+            <div className="flex-1 overflow-hidden flex flex-col md:flex-row relative">
+               <div className="w-full md:w-80 p-8 border-r border-slate-100 bg-slate-50/30 space-y-6 overflow-y-auto thin-scrollbar">
+                  <div className="space-y-5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Identificação da Ficha</label>
+                    <input type="text" placeholder="Ex: Hipertrofia Pernas A" className="w-full p-5 bg-white border border-slate-200 rounded-2xl font-bold text-xs outline-none focus:ring-2 focus:ring-indigo-500" value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} />
+                    <div className="grid grid-cols-2 gap-4">
+                       <div>
+                          <label className="text-[9px] font-black text-slate-400 uppercase mb-2 block">Letra Split</label>
+                          <select className="w-full p-4 bg-white border border-slate-200 rounded-2xl font-bold text-xs" value={formData.splitLetter} onChange={e => setFormData({...formData, splitLetter: e.target.value})}>
+                             {['A','B','C','D','E','F'].map(l => <option key={l} value={l}>{l}</option>)}
+                          </select>
+                       </div>
+                       <div>
+                          <label className="text-[9px] font-black text-slate-400 uppercase mb-2 block">Nível</label>
+                          <select className="w-full p-4 bg-white border border-slate-200 rounded-2xl font-bold text-xs" value={formData.level} onChange={e => setFormData({...formData, level: e.target.value as TrainingLevel})}>
+                             <option value="Iniciante">Iniciante</option>
+                             <option value="Intermediário">Interm.</option>
+                             <option value="Avançado">Avançado</option>
+                          </select>
+                       </div>
+                    </div>
+                    <textarea placeholder="Observações e métodos..." className="w-full p-5 bg-white border border-slate-200 rounded-2xl font-bold text-xs outline-none min-h-[140px]" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} />
+                  </div>
+                  <div className="pt-6 border-t border-slate-200">
+                    <button onClick={() => { setShowLibrary(true); setLibraryLevelFilter(formData.level); }} className="w-full py-5 border-2 border-dashed border-indigo-200 text-indigo-600 rounded-[1.5rem] font-black text-[11px] uppercase tracking-widest hover:bg-indigo-50 transition-all flex items-center justify-center gap-3">
+                      <span>🏋️</span> Acessar Biblioteca
+                    </button>
+                  </div>
+               </div>
+               <div className="flex-1 p-10 overflow-y-auto bg-white thin-scrollbar">
+                  <div className="space-y-5">
+                    {exercises.length === 0 ? (
+                      <div className="h-96 flex flex-col items-center justify-center text-center opacity-20">
+                         <span className="text-7xl mb-6">🖋️</span>
+                         <p className="text-sm font-black uppercase tracking-[0.3em]">Nenhum exercício prescrito</p>
+                      </div>
+                    ) : (
+                      exercises.map((ex, idx) => (
+                        <div key={ex.id} className="bg-slate-50/50 border border-slate-100 p-8 rounded-[2.5rem] flex flex-col items-center gap-8 group hover:border-indigo-200 transition-all animate-in slide-in-from-left">
+                           <div className="flex items-center gap-6 w-full">
+                              <div className="w-10 h-10 bg-slate-900 text-white rounded-2xl flex items-center justify-center font-black text-xs">{idx + 1}</div>
+                              <input type="text" className="flex-1 bg-transparent font-black text-slate-800 text-lg outline-none" value={ex.name} onChange={e => setExercises(exercises.map(item => item.id === ex.id ? { ...item, name: e.target.value } : item))} />
+                              <button onClick={() => setExercises(exercises.filter(item => item.id !== ex.id))} className="p-3 text-slate-300 hover:text-rose-500 transition-colors">🗑️</button>
+                           </div>
+                           <div className="w-full grid grid-cols-3 gap-4">
+                              <input type="text" placeholder="Séries" className="p-3 bg-white border rounded-xl text-center font-black text-xs" value={ex.sets} onChange={e => setExercises(exercises.map(item => item.id === ex.id ? { ...item, sets: e.target.value } : item))} />
+                              <input type="text" placeholder="Reps" className="p-3 bg-white border rounded-xl text-center font-black text-xs" value={ex.reps} onChange={e => setExercises(exercises.map(item => item.id === ex.id ? { ...item, reps: e.target.value } : item))} />
+                              <input type="text" placeholder="Descanso" className="p-3 bg-white border rounded-xl text-center font-black text-xs" value={ex.rest} onChange={e => setExercises(exercises.map(item => item.id === ex.id ? { ...item, rest: e.target.value } : item))} />
+                           </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+               </div>
+            </div>
+            <div className="p-8 bg-slate-50 border-t border-slate-100 flex justify-end gap-4">
+               <button onClick={handleSaveProgram} className="px-14 py-6 bg-slate-950 text-white rounded-[2rem] font-black text-[11px] uppercase tracking-widest shadow-2xl hover:bg-indigo-600 transition-all flex items-center gap-4">💾 Publicar Ficha de Treino</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL BIBLIOTECA (PRESERVADO) */}
+      {showLibrary && (
+        <div className="fixed inset-0 bg-slate-900/90 backdrop-blur-md z-[210] flex items-center justify-center p-4">
+           <div className="bg-white w-full max-w-4xl h-[85vh] rounded-[3.5rem] shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom">
+              <div className="p-10 border-b flex justify-between items-center bg-slate-50/50">
+                 <h4 className="text-2xl font-black text-slate-800 uppercase tracking-tight">Biblioteca de Exercícios</h4>
+                 <button onClick={() => setShowLibrary(false)} className="text-slate-300 hover:text-rose-500 text-4xl">&times;</button>
+              </div>
+              <div className="flex-1 overflow-y-auto p-10 grid grid-cols-1 md:grid-cols-2 gap-4 thin-scrollbar">
+                 {filteredLibrary.map(libEx => (
+                   <button key={libEx.name} onClick={() => { addExerciseFromLibrary(libEx); setShowLibrary(false); }} className="w-full flex items-center p-6 bg-slate-50/50 hover:bg-white rounded-[2rem] border border-slate-100 hover:border-indigo-500 transition-all text-left group">
+                     <div className="w-14 h-14 bg-white shadow-sm rounded-2xl flex items-center justify-center text-3xl mr-6">{libEx.icon}</div>
+                     <div className="flex-1">
+                        <p className="font-black text-slate-800 text-lg leading-tight">{libEx.name}</p>
+                        <p className="text-[10px] text-slate-400 font-bold uppercase mt-1">{libEx.category} | {libEx.defaultStage}</p>
+                     </div>
+                   </button>
+                 ))}
+              </div>
+           </div>
+        </div>
+      )}
+
+      {/* DETALHES VISUALIZAÇÃO (PRESERVADO) */}
+      {detailsProgram && (
+        <div className="fixed inset-0 bg-slate-900/95 backdrop-blur-xl z-[300] flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-4xl h-[90vh] rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in flex flex-col">
+             <div className="p-10 bg-slate-950 text-white flex justify-between items-center">
+                <div className="flex items-center gap-6">
+                   <div className="w-16 h-16 bg-indigo-600 rounded-3xl flex items-center justify-center text-3xl">🏋️</div>
+                   <div><span className="text-[9px] font-black bg-indigo-500 px-3 py-1 rounded-full uppercase tracking-widest">Treino {detailsProgram.splitLetter}</span><h3 className="text-3xl font-black mt-2">{detailsProgram.title}</h3></div>
+                </div>
+                <button onClick={() => setDetailsProgram(null)} className="text-white/30 hover:text-white text-5xl">&times;</button>
+             </div>
+             <div className="flex-1 overflow-y-auto p-10 space-y-4">
+                {detailsProgram.exercises.map((ex, i) => (
+                   <div key={i} className="bg-white p-8 rounded-[2.5rem] border border-slate-100 flex items-center gap-10 shadow-sm">
+                      <div className="flex-1">
+                         <p className="text-[9px] font-black text-indigo-500 uppercase mb-1">{ex.stage}</p>
+                         <h5 className="text-xl font-black text-slate-800">{ex.name}</h5>
+                      </div>
+                      <div className="flex gap-10">
+                         <div className="text-center"><p className="text-[9px] font-bold text-slate-300 uppercase mb-1">Séries</p><p className="text-2xl font-black text-slate-900">{ex.sets}</p></div>
+                         <div className="text-center"><p className="text-[9px] font-bold text-slate-300 uppercase mb-1">Reps</p><p className="text-2xl font-black text-slate-900">{ex.reps}</p></div>
+                      </div>
+                   </div>
+                ))}
+             </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default TrainingPrograms;
