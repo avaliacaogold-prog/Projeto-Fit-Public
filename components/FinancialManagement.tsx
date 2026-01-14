@@ -72,48 +72,48 @@ const FinancialManagement: React.FC<FinancialManagementProps> = ({ clients, paym
     <div className="space-y-10">
       {/* Finance Overview */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-         <FinanceCard label="Faturamento Recebido" value={`R$ ${totalPaid.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} color="bg-emerald-50 text-emerald-600" icon="✔️" />
-         <FinanceCard label="Total a Receber" value={`R$ ${totalPending.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} color="bg-amber-50 text-amber-600" icon="⏳" />
+         <FinanceCard label="Faturamento Recebido" value={`R$ ${totalPaid.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} color="bg-emerald-100 text-emerald-700" icon="✔️" />
+         <FinanceCard label="Total a Receber" value={`R$ ${totalPending.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} color="bg-amber-100 text-amber-700" icon="⏳" />
          <div className="bg-slate-950 p-10 rounded-[3.5rem] flex flex-col items-center justify-center text-center shadow-2xl relative overflow-hidden group">
             <div className="absolute inset-0 bg-amber-400/10 opacity-0 group-hover:opacity-100 transition-opacity"></div>
             <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">Ações Financeiras</p>
-            <button onClick={() => setIsModalOpen(true)} className="bg-amber-400 text-slate-950 px-10 py-5 rounded-3xl font-black text-xs uppercase tracking-widest shadow-xl hover:scale-105 transition-all">Nova Cobrança</button>
+            <button onClick={() => setIsModalOpen(true)} className="bg-amber-400 text-slate-950 px-10 py-5 rounded-3xl font-black text-xs uppercase tracking-widest shadow-xl hover:scale-105 transition-all active:scale-95">Nova Cobrança</button>
          </div>
       </div>
 
-      <div className="bg-white rounded-[4rem] border border-slate-100 shadow-sm overflow-hidden">
-         <div className="p-10 border-b border-slate-50 flex flex-col md:flex-row justify-between items-center gap-6 bg-slate-50/50">
+      <div className="bg-white rounded-[4rem] border border-slate-200 shadow-sm overflow-hidden no-print">
+         <div className="p-10 border-b border-slate-100 flex flex-col md:flex-row justify-between items-center gap-6 bg-slate-50/80">
             <div>
-               <h4 className="font-black text-slate-900 text-xl tracking-tight uppercase">Fluxo de Caixa</h4>
-               <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">Listagem de títulos e recebimentos</p>
+               <h4 className="font-black text-slate-900 text-2xl tracking-tighter uppercase">Fluxo de Caixa</h4>
+               <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-1">Gestão de títulos e recebimentos</p>
             </div>
             
-            <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
-               <div className="flex flex-col gap-1 flex-1 md:flex-none">
-                  <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest ml-2">Status</label>
+            <div className="flex flex-wrap items-center gap-4 w-full md:w-auto">
+               <div className="flex flex-col gap-2 flex-1 md:flex-none">
+                  <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-2">Filtrar Status</label>
                   <select 
-                    className="px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-[10px] font-black uppercase outline-none focus:ring-2 focus:ring-indigo-500 transition-all min-w-[120px]"
+                    className="px-5 py-3 bg-white border-2 border-slate-200 rounded-2xl text-[11px] font-black uppercase outline-none focus:ring-2 focus:ring-indigo-500 transition-all min-w-[150px] shadow-sm"
                     value={statusFilter}
                     onChange={(e) => setStatusFilter(e.target.value as any)}
                   >
                     <option value="ALL">Todos os Status</option>
-                    <option value={PaymentStatus.PAID}>Liquidados (Pagos)</option>
+                    <option value={PaymentStatus.PAID}>Liquidados</option>
                     <option value={PaymentStatus.PENDING}>Em Aberto</option>
                     <option value={PaymentStatus.CANCELED}>Cancelados</option>
                   </select>
                </div>
 
-               <div className="flex flex-col gap-1 flex-1 md:flex-none">
-                  <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest ml-2">Período</label>
+               <div className="flex flex-col gap-2 flex-1 md:flex-none">
+                  <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-2">Período</label>
                   <select 
-                    className="px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-[10px] font-black uppercase outline-none focus:ring-2 focus:ring-indigo-500 transition-all min-w-[140px]"
+                    className="px-5 py-3 bg-white border-2 border-slate-200 rounded-2xl text-[11px] font-black uppercase outline-none focus:ring-2 focus:ring-indigo-500 transition-all min-w-[160px] shadow-sm"
                     value={periodFilter}
                     onChange={(e) => setPeriodFilter(e.target.value as PeriodFilter)}
                   >
-                    <option value="all">Todo o Período</option>
-                    <option value="current_month">Mês Atual</option>
+                    <option value="all">Todo o Histórico</option>
+                    <option value="current_month">Mês Vigente</option>
                     <option value="next_30">Próximos 30 Dias</option>
-                    <option value="overdue">Atrasados</option>
+                    <option value="overdue">Inadimplentes</option>
                   </select>
                </div>
             </div>
@@ -122,39 +122,39 @@ const FinancialManagement: React.FC<FinancialManagementProps> = ({ clients, paym
          <div className="overflow-x-auto thin-scrollbar">
             <table className="w-full text-left">
                <thead>
-                  <tr className="border-b border-slate-100">
-                     <th className="px-10 py-8 text-[10px] font-black text-slate-400 uppercase tracking-widest">Aluno / Descrição</th>
-                     <th className="px-10 py-8 text-[10px] font-black text-slate-400 uppercase tracking-widest">Plano</th>
-                     <th className="px-10 py-8 text-[10px] font-black text-slate-400 uppercase tracking-widest">Vencimento</th>
-                     <th className="px-10 py-8 text-[10px] font-black text-slate-400 uppercase tracking-widest">Valor</th>
-                     <th className="px-10 py-8 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Ação</th>
+                  <tr className="border-b-2 border-slate-100 bg-slate-50/50">
+                     <th className="px-10 py-8 text-[10px] font-black text-slate-500 uppercase tracking-widest">Aluno / Identificador</th>
+                     <th className="px-10 py-8 text-[10px] font-black text-slate-500 uppercase tracking-widest text-center">Contrato</th>
+                     <th className="px-10 py-8 text-[10px] font-black text-slate-500 uppercase tracking-widest">Vencimento</th>
+                     <th className="px-10 py-8 text-[10px] font-black text-slate-500 uppercase tracking-widest">Valor</th>
+                     <th className="px-10 py-8 text-[10px] font-black text-slate-500 uppercase tracking-widest text-right">Ação</th>
                   </tr>
                </thead>
-               <tbody className="divide-y divide-slate-50">
+               <tbody className="divide-y-2 divide-slate-50">
                   {filteredPayments.map(p => (
-                     <tr key={p.id} className="hover:bg-slate-50/30 transition-colors">
+                     <tr key={p.id} className="hover:bg-indigo-50/20 transition-colors">
                         <td className="px-10 py-8">
-                           <p className="font-black text-slate-800 text-sm leading-tight">{p.clientName}</p>
-                           <p className="text-[10px] text-slate-400 font-bold uppercase mt-1">{p.description}</p>
+                           <p className="font-black text-slate-900 text-base leading-tight">{p.clientName}</p>
+                           <p className="text-[10px] text-slate-500 font-bold uppercase mt-1 tracking-wider">{p.description}</p>
                         </td>
-                        <td className="px-10 py-8">
-                           <span className="bg-slate-100 text-slate-500 px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest">{p.planType}</span>
+                        <td className="px-10 py-8 text-center">
+                           <span className="bg-slate-900 text-white px-5 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest shadow-md">{p.planType}</span>
                         </td>
-                        <td className="px-10 py-8 text-xs font-bold text-slate-500">{new Date(p.dueDate + 'T12:00:00').toLocaleDateString('pt-BR')}</td>
-                        <td className="px-10 py-8 font-black text-slate-900 text-base">R$ {p.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                        <td className="px-10 py-8 text-sm font-bold text-slate-700">{new Date(p.dueDate + 'T12:00:00').toLocaleDateString('pt-BR')}</td>
+                        <td className="px-10 py-8 font-black text-slate-950 text-xl tracking-tighter">R$ {p.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
                         <td className="px-10 py-8 text-right">
                            {p.status === PaymentStatus.PAID ? (
-                              <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-5 py-2.5 rounded-2xl border border-emerald-100 uppercase tracking-widest">Liquidado</span>
+                              <span className="text-[10px] font-black text-emerald-700 bg-emerald-100 px-6 py-3 rounded-2xl border-2 border-emerald-200 uppercase tracking-widest shadow-sm">Pago em Dia</span>
                            ) : p.status === PaymentStatus.CANCELED ? (
-                              <span className="text-[10px] font-black text-slate-400 bg-slate-50 px-5 py-2.5 rounded-2xl border border-slate-100 uppercase tracking-widest">Cancelado</span>
+                              <span className="text-[10px] font-black text-slate-400 bg-slate-100 px-6 py-3 rounded-2xl border-2 border-slate-200 uppercase tracking-widest">Estornado</span>
                            ) : (
-                              <button onClick={() => onUpdateStatus(p.id, PaymentStatus.PAID)} className="bg-slate-900 text-white px-8 py-3 rounded-2xl font-black text-[9px] uppercase tracking-widest hover:bg-emerald-600 transition-all shadow-lg">Dar Baixa</button>
+                              <button onClick={() => onUpdateStatus(p.id, PaymentStatus.PAID)} className="bg-slate-900 text-white px-10 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-600 transition-all shadow-xl active:scale-90">Dar Baixa</button>
                            )}
                         </td>
                      </tr>
                   ))}
                   {filteredPayments.length === 0 && (
-                    <tr><td colSpan={5} className="p-20 text-center opacity-20 font-black uppercase text-xs">Nenhum lançamento encontrado para os filtros aplicados</td></tr>
+                    <tr><td colSpan={5} className="p-32 text-center opacity-30 font-black uppercase text-sm tracking-widest">Nenhum registro financeiro encontrado</td></tr>
                   )}
                </tbody>
             </table>
@@ -162,31 +162,34 @@ const FinancialManagement: React.FC<FinancialManagementProps> = ({ clients, paym
       </div>
 
       {isModalOpen && (
-        <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-xl z-[200] flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-xl rounded-[4rem] shadow-2xl overflow-hidden animate-in zoom-in duration-300">
-            <div className="p-10 border-b flex justify-between items-center bg-slate-50">
-               <h3 className="text-2xl font-black text-slate-900 uppercase">Lançamento de Título</h3>
-               <button onClick={() => setIsModalOpen(false)} className="text-slate-300 hover:text-rose-500 text-4xl">&times;</button>
+        <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-xl z-[500] flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-xl rounded-[4rem] shadow-2xl overflow-hidden animate-in zoom-in duration-300 border-2 border-white/20">
+            <div className="p-10 border-b flex justify-between items-center bg-slate-50/50">
+               <div>
+                  <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">Nova Ordem de Recebimento</h3>
+                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-1">Lançamento direto no fluxo de caixa</p>
+               </div>
+               <button onClick={() => setIsModalOpen(false)} className="text-slate-300 hover:text-rose-500 text-5xl transition-colors">&times;</button>
             </div>
             <form onSubmit={handleSubmit} className="p-12 space-y-8">
                <div className="space-y-3">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Aluno Destinatário</label>
-                  <select className="w-full p-5 bg-slate-50 border-2 border-slate-100 rounded-[2rem] font-black text-xs outline-none focus:border-amber-400 transition-all" value={formData.clientId} onChange={e => setFormData({...formData, clientId: e.target.value})}>
-                     <option value="">Selecione o Aluno</option>
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-2">Selecione o Aluno</label>
+                  <select className="w-full p-6 bg-slate-50 border-2 border-slate-200 rounded-[2rem] font-black text-base outline-none focus:border-indigo-500 shadow-inner" value={formData.clientId} onChange={e => setFormData({...formData, clientId: e.target.value})} required>
+                     <option value="">Buscar aluno...</option>
                      {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                   </select>
                </div>
                <div className="grid grid-cols-2 gap-8">
                   <div className="space-y-3">
-                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Vencimento</label>
-                     <input type="date" className="w-full p-5 bg-slate-50 border-2 border-slate-100 rounded-[2rem] font-black text-xs outline-none focus:border-amber-400" value={formData.dueDate} onChange={e => setFormData({...formData, dueDate: e.target.value})} />
+                     <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-2">Vencimento</label>
+                     <input type="date" className="w-full p-6 bg-slate-50 border-2 border-slate-200 rounded-[2rem] font-black text-base outline-none focus:border-indigo-500 shadow-inner" value={formData.dueDate} onChange={e => setFormData({...formData, dueDate: e.target.value})} required />
                   </div>
                   <div className="space-y-3">
-                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Valor (R$)</label>
-                     <input type="number" step="0.01" className="w-full p-5 bg-slate-50 border-2 border-slate-100 rounded-[2rem] font-black text-xs outline-none focus:border-amber-400" value={formData.amount} onChange={e => setFormData({...formData, amount: e.target.value})} />
+                     <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-2">Valor Total</label>
+                     <input type="number" step="0.01" className="w-full p-6 bg-slate-50 border-2 border-slate-200 rounded-[2rem] font-black text-base outline-none focus:border-indigo-500 shadow-inner" value={formData.amount} onChange={e => setFormData({...formData, amount: e.target.value})} required />
                   </div>
                </div>
-               <button type="submit" className="w-full bg-slate-950 text-white py-6 rounded-[2rem] font-black text-xs uppercase tracking-widest shadow-2xl hover:bg-amber-400 hover:text-slate-950 transition-all">Confirmar Lançamento</button>
+               <button type="submit" className="w-full bg-slate-950 text-white py-7 rounded-[2.5rem] font-black text-xs uppercase tracking-[0.2em] shadow-2xl hover:bg-indigo-600 transition-all active:scale-95">Efetivar Lançamento</button>
             </form>
           </div>
         </div>
@@ -196,13 +199,13 @@ const FinancialManagement: React.FC<FinancialManagementProps> = ({ clients, paym
 };
 
 const FinanceCard = ({ label, value, color, icon }: any) => (
-  <div className="bg-white p-10 rounded-[3.5rem] border border-slate-100 shadow-sm flex items-center gap-8 group hover:shadow-xl transition-all">
-     <div className={`w-16 h-16 rounded-[1.5rem] flex items-center justify-center text-2xl shadow-inner ${color}`}>
+  <div className="bg-white p-10 rounded-[3.5rem] border-2 border-slate-100 shadow-sm flex items-center gap-8 group hover:border-indigo-200 transition-all hover:shadow-xl">
+     <div className={`w-16 h-16 rounded-[1.5rem] flex items-center justify-center text-3xl shadow-lg ${color}`}>
         {icon}
      </div>
      <div>
-        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{label}</p>
-        <p className="text-2xl font-black text-slate-900">{value}</p>
+        <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">{label}</p>
+        <p className="text-3xl font-black text-slate-950 tracking-tighter">{value}</p>
      </div>
   </div>
 );

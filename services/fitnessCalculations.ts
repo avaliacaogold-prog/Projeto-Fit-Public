@@ -10,7 +10,7 @@ export const calculateAge = (birthDate: string, referenceDate: string = new Date
   if (m < 0 || (m === 0 && ref.getDate() < birth.getDate())) {
     age--;
   }
-  return age;
+  return Math.max(0, age);
 };
 
 export const getActivityFactor = (lifestyle: string): number => {
@@ -40,14 +40,15 @@ export const calculateBodyFat = (
 ): number => {
   const isMale = gender === 'M';
   const sf = skinfolds;
+  const safeAge = Math.max(1, age);
 
   try {
     if (protocol === 'Pollock7') {
       const sum = sf.chest + sf.midaxillary + sf.triceps + sf.subscapular + sf.abdominal + sf.suprailiac + sf.thigh;
       if (sum <= 0) return 0;
       const density = isMale
-        ? 1.112 - (0.00043499 * sum) + (0.00000055 * Math.pow(sum, 2)) - (0.00028826 * age)
-        : 1.097 - (0.00046971 * sum) + (0.00000056 * Math.pow(sum, 2)) - (0.00012828 * age);
+        ? 1.112 - (0.00043499 * sum) + (0.00000055 * Math.pow(sum, 2)) - (0.00028826 * safeAge)
+        : 1.097 - (0.00046971 * sum) + (0.00000056 * Math.pow(sum, 2)) - (0.00012828 * safeAge);
       return Math.max(2, Math.min(60, ((4.95 / density) - 4.50) * 100));
     }
     
@@ -57,8 +58,8 @@ export const calculateBodyFat = (
         : (sf.triceps + sf.suprailiac + sf.thigh);
       if (sum <= 0) return 0;
       const density = isMale
-        ? 1.10938 - (0.0008267 * sum) + (0.0000016 * Math.pow(sum, 2)) - (0.0002574 * age)
-        : 1.0994921 - (0.0009929 * sum) + (0.0000023 * Math.pow(sum, 2)) - (0.0001392 * age);
+        ? 1.10938 - (0.0008267 * sum) + (0.0000016 * Math.pow(sum, 2)) - (0.0002574 * safeAge)
+        : 1.0994921 - (0.0009929 * sum) + (0.0000023 * Math.pow(sum, 2)) - (0.0001392 * safeAge);
       return Math.max(2, Math.min(60, ((4.95 / density) - 4.50) * 100));
     }
 
@@ -76,16 +77,16 @@ export const calculateBodyFat = (
       const density = isMale 
         ? 1.1714 - (0.063 * Math.log10(sum))
         : 1.1665 - (0.0706 * Math.log10(sum));
-      return ((4.95 / density) - 4.50) * 100;
+      return Math.max(2, ((4.95 / density) - 4.50) * 100);
     }
 
     if (protocol === 'Petroski') {
       const sum = sf.subscapular + sf.triceps + sf.suprailiac + sf.calf;
       if (sum <= 0) return 0;
       const density = isMale 
-        ? 1.10726863 - (0.0012836 * sum) + (0.00000168 * Math.pow(sum, 2)) - (0.00012873 * age)
-        : 1.1954713 - (0.07513507 * Math.log10(sum)) - (0.00041072 * age);
-      return ((4.95 / density) - 4.50) * 100;
+        ? 1.10726863 - (0.0012836 * sum) + (0.00000168 * Math.pow(sum, 2)) - (0.00012873 * safeAge)
+        : 1.1954713 - (0.07513507 * Math.log10(sum)) - (0.00041072 * safeAge);
+      return Math.max(2, ((4.95 / density) - 4.50) * 100);
     }
 
     return 0;
@@ -114,17 +115,13 @@ export const calculateVO2Max = (protocol: 'Cooper' | 'Rockport' | 'YMCA', testVa
 export const calculateSomatotype = (skinfolds: Skinfolds, perimeters: Perimeters, height: number, weight: number): Somatotype => {
   if (height <= 0 || weight <= 0) return { endomorphy: 0.1, mesomorphy: 0.1, ectomorphy: 0.1, classification: 'N/A' };
   
-  // Heath-Carter Formulas
   const sum3 = skinfolds.triceps + skinfolds.subscapular + skinfolds.suprailiac;
   const hCorrected = sum3 * (170.18 / height);
   const endo = -0.7182 + (0.1451 * hCorrected) - (0.00068 * Math.pow(hCorrected, 2)) + (0.0000014 * Math.pow(hCorrected, 3));
   
   const armCorr = perimeters.armFlexed - (skinfolds.triceps / 10);
   const calfCorr = perimeters.calf - (skinfolds.calf / 10);
-  
-  // Assuming bi-epicondylar humerus and femur are also needed for full accuracy but using approximations from perimeters
-  // For the sake of the existing UI and simplicity, we maintain the perimeter-based approximation
-  const meso = (0.85 * 5.5) + (0.601 * 7.5) + (0.188 * armCorr) + (0.161 * calfCorr) - (0.131 * height) + 4.5;
+  const meso = (0.188 * armCorr) + (0.161 * calfCorr) - (0.131 * height) + 4.5;
   
   const hwr = height / Math.pow(weight, 1/3);
   let ecto = 0.1;
