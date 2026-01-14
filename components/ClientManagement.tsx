@@ -49,7 +49,6 @@ const ClientManagement: React.FC<ClientManagementProps> = ({
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     const clientTraining = trainingPrograms.filter(p => p.clientId === summaryClientId);
     
-    // Preparar dados para o gráfico de evolução
     const chartData = clientEvals.map(e => ({
       date: new Date(e.date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
       weight: e.weight,
@@ -103,6 +102,7 @@ const ClientManagement: React.FC<ClientManagementProps> = ({
   const closeModal = () => { setIsModalOpen(false); setEditingClient(null); setErrors({}); };
 
   const handlePrint = () => {
+    alert("DICA: Na janela que abrir, selecione 'Salvar como PDF' no destino da impressora.");
     window.print();
   };
 
@@ -202,7 +202,6 @@ const ClientManagement: React.FC<ClientManagementProps> = ({
         </table>
       </div>
 
-      {/* MODAL RESUMO DE EVOLUÇÃO (RELATÓRIO PDF) */}
       {summaryClientId && summaryData && (
         <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-xl z-[500] flex items-center justify-center p-4 print:p-0 print:static print:bg-white print:z-auto">
           <div className="bg-white w-full max-w-5xl h-[92vh] rounded-[3.5rem] shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom duration-300 print:h-auto print:rounded-none print:shadow-none print:max-w-none">
@@ -225,7 +224,6 @@ const ClientManagement: React.FC<ClientManagementProps> = ({
             </div>
 
             <div className="flex-1 overflow-y-auto p-12 space-y-12 thin-scrollbar print:overflow-visible print:p-0">
-               {/* Header do Relatório Impresso */}
                <div className="hidden print:flex justify-between items-start border-b-4 border-slate-900 pb-8 mb-12">
                   <div>
                     <h1 className="text-4xl font-black text-slate-900 uppercase leading-none mb-2">VITALMETRIC<span className="text-indigo-600">PRO</span></h1>
@@ -237,7 +235,6 @@ const ClientManagement: React.FC<ClientManagementProps> = ({
                   </div>
                </div>
 
-               {/* Dados do Aluno */}
                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                   <div className="bg-slate-50 p-8 rounded-[2rem] border border-slate-100 print:bg-white print:border-slate-200">
                      <p className="text-[9px] font-black text-indigo-500 uppercase tracking-widest mb-2">Aluno</p>
@@ -256,7 +253,6 @@ const ClientManagement: React.FC<ClientManagementProps> = ({
                   </div>
                </div>
 
-               {/* Gráfico de Evolução de Linha */}
                {summaryData.chartData.length > 1 ? (
                  <div className="space-y-6">
                     <h5 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-3">
@@ -273,7 +269,6 @@ const ClientManagement: React.FC<ClientManagementProps> = ({
                                 tick={{fontSize: 10, fontWeight: 800, fill: '#94a3b8'}} 
                                 dy={10}
                              />
-                             {/* Eixo Y Esquerdo - Peso */}
                              <YAxis 
                                 yAxisId="left"
                                 axisLine={false} 
@@ -281,7 +276,6 @@ const ClientManagement: React.FC<ClientManagementProps> = ({
                                 tick={{fontSize: 10, fontWeight: 800, fill: '#6366f1'}} 
                                 label={{ value: 'Peso (kg)', angle: -90, position: 'insideLeft', offset: 0, fontSize: 10, fontWeight: 800, fill: '#6366f1' }}
                              />
-                             {/* Eixo Y Direito - BF */}
                              <YAxis 
                                 yAxisId="right"
                                 orientation="right"
@@ -332,7 +326,6 @@ const ClientManagement: React.FC<ClientManagementProps> = ({
                  </div>
                )}
 
-               {/* Histórico de Medidas */}
                <div className="space-y-6">
                   <h5 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-3">
                      <div className="w-8 h-[2px] bg-indigo-600"></div> Histórico de Resultados Detalhados
@@ -363,7 +356,6 @@ const ClientManagement: React.FC<ClientManagementProps> = ({
                   </div>
                </div>
 
-               {/* Treinos Ativos */}
                <div className="space-y-6 break-before-page">
                   <h5 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-3">
                      <div className="w-8 h-[2px] bg-indigo-600"></div> Planejamento de Treino Ativo
@@ -387,11 +379,6 @@ const ClientManagement: React.FC<ClientManagementProps> = ({
                            </ul>
                         </div>
                      ))}
-                     {summaryData.clientTraining.length === 0 && (
-                        <div className="col-span-2 p-12 text-center bg-slate-50 rounded-[3rem] border-2 border-dashed border-slate-200 opacity-50">
-                           <p className="text-[10px] font-black uppercase text-slate-400">Nenhum programa de treino registrado</p>
-                        </div>
-                     )}
                   </div>
                </div>
             </div>

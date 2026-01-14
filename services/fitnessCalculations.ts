@@ -2,6 +2,7 @@
 import { Skinfolds, EvaluationProtocol, Perimeters, Somatotype } from '../types';
 
 export const calculateAge = (birthDate: string, referenceDate: string = new Date().toISOString()): number => {
+  if (!birthDate) return 0;
   const birth = new Date(birthDate);
   const ref = new Date(referenceDate);
   let age = ref.getFullYear() - birth.getFullYear();
@@ -24,6 +25,7 @@ export const getActivityFactor = (lifestyle: string): number => {
 };
 
 export const calculateTDEE = (bmr: number, lifestyle: string): number => {
+  if (bmr <= 0) return 0;
   return bmr * getActivityFactor(lifestyle);
 };
 
@@ -42,25 +44,27 @@ export const calculateBodyFat = (
   try {
     if (protocol === 'Pollock7') {
       const sum = sf.chest + sf.midaxillary + sf.triceps + sf.subscapular + sf.abdominal + sf.suprailiac + sf.thigh;
-      if (sum === 0) return 0;
+      if (sum <= 0) return 0;
       const density = isMale
         ? 1.112 - (0.00043499 * sum) + (0.00000055 * Math.pow(sum, 2)) - (0.00028826 * age)
         : 1.097 - (0.00046971 * sum) + (0.00000056 * Math.pow(sum, 2)) - (0.00012828 * age);
-      return Math.max(3, ((4.95 / density) - 4.50) * 100);
+      return Math.max(2, Math.min(60, ((4.95 / density) - 4.50) * 100));
     }
     
     if (protocol === 'Pollock3') {
       const sum = isMale 
         ? (sf.chest + sf.abdominal + sf.thigh)
         : (sf.triceps + sf.suprailiac + sf.thigh);
+      if (sum <= 0) return 0;
       const density = isMale
         ? 1.10938 - (0.0008267 * sum) + (0.0000016 * Math.pow(sum, 2)) - (0.0002574 * age)
         : 1.0994921 - (0.0009929 * sum) + (0.0000023 * Math.pow(sum, 2)) - (0.0001392 * age);
-      return Math.max(3, ((4.95 / density) - 4.50) * 100);
+      return Math.max(2, Math.min(60, ((4.95 / density) - 4.50) * 100));
     }
 
     if (protocol === 'Faulkner') {
       const sum = sf.triceps + sf.subscapular + sf.suprailiac + sf.abdominal;
+      if (sum <= 0) return 0;
       return (sum * 0.153) + 5.783;
     }
 
@@ -68,6 +72,7 @@ export const calculateBodyFat = (
       const sum = isMale 
         ? (sf.triceps + sf.suprailiac + sf.abdominal)
         : (sf.triceps + sf.suprailiac + sf.thigh);
+      if (sum <= 0) return 0;
       const density = isMale 
         ? 1.1714 - (0.063 * Math.log10(sum))
         : 1.1665 - (0.0706 * Math.log10(sum));
@@ -75,27 +80,27 @@ export const calculateBodyFat = (
     }
 
     if (protocol === 'Petroski') {
-      // Petroski (1995) uses: Subscapular, Triceps, Suprailiac, and Calf (Panturrilha) for both genders
       const sum = sf.subscapular + sf.triceps + sf.suprailiac + sf.calf;
-      if (sum === 0) return 0;
+      if (sum <= 0) return 0;
       const density = isMale 
         ? 1.10726863 - (0.0012836 * sum) + (0.00000168 * Math.pow(sum, 2)) - (0.00012873 * age)
         : 1.1954713 - (0.07513507 * Math.log10(sum)) - (0.00041072 * age);
       return ((4.95 / density) - 4.50) * 100;
     }
 
-    return 15;
+    return 0;
   } catch (e) { return 0; }
 };
 
 export const calculateVO2Max = (protocol: 'Cooper' | 'Rockport' | 'YMCA', testValue: number, age: number, weight: number, gender: 'M' | 'F' | 'O', hrFinal?: number) => {
+  if (testValue <= 0) return 0;
+  
   if (protocol === 'Cooper') {
-    if (!testValue || testValue < 505) return 0;
+    if (testValue < 505) return 0;
     return (testValue - 504.9) / 44.73;
   }
   
   if (protocol === 'Rockport') {
-    if (!testValue || testValue <= 0) return 0;
     const weightLb = weight * 2.20462;
     const genderCode = gender === 'M' ? 1 : 0;
     const hr = hrFinal || 120;
@@ -107,12 +112,18 @@ export const calculateVO2Max = (protocol: 'Cooper' | 'Rockport' | 'YMCA', testVa
 };
 
 export const calculateSomatotype = (skinfolds: Skinfolds, perimeters: Perimeters, height: number, weight: number): Somatotype => {
+  if (height <= 0 || weight <= 0) return { endomorphy: 0.1, mesomorphy: 0.1, ectomorphy: 0.1, classification: 'N/A' };
+  
+  // Heath-Carter Formulas
   const sum3 = skinfolds.triceps + skinfolds.subscapular + skinfolds.suprailiac;
   const hCorrected = sum3 * (170.18 / height);
   const endo = -0.7182 + (0.1451 * hCorrected) - (0.00068 * Math.pow(hCorrected, 2)) + (0.0000014 * Math.pow(hCorrected, 3));
   
   const armCorr = perimeters.armFlexed - (skinfolds.triceps / 10);
   const calfCorr = perimeters.calf - (skinfolds.calf / 10);
+  
+  // Assuming bi-epicondylar humerus and femur are also needed for full accuracy but using approximations from perimeters
+  // For the sake of the existing UI and simplicity, we maintain the perimeter-based approximation
   const meso = (0.85 * 5.5) + (0.601 * 7.5) + (0.188 * armCorr) + (0.161 * calfCorr) - (0.131 * height) + 4.5;
   
   const hwr = height / Math.pow(weight, 1/3);
@@ -121,14 +132,18 @@ export const calculateSomatotype = (skinfolds: Skinfolds, perimeters: Perimeters
   else if (hwr < 40.75 && hwr > 38.25) ecto = (hwr * 0.463) - 17.63;
 
   let classification = "Central";
-  if (endo > meso + 0.5 && endo > ecto + 0.5) classification = "Endomorfo";
-  else if (meso > endo + 0.5 && meso > ecto + 0.5) classification = "Mesomorfo";
-  else if (ecto > endo + 0.5 && ecto > meso + 0.5) classification = "Ectomorfo";
+  const safeEndo = Math.max(0.1, endo);
+  const safeMeso = Math.max(0.1, meso);
+  const safeEcto = Math.max(0.1, ecto);
+
+  if (safeEndo > safeMeso + 0.5 && safeEndo > safeEcto + 0.5) classification = "Endomorfo";
+  else if (safeMeso > safeEndo + 0.5 && safeMeso > safeEcto + 0.5) classification = "Mesomorfo";
+  else if (safeEcto > safeEndo + 0.5 && safeEcto > safeMeso + 0.5) classification = "Ectomorfo";
 
   return {
-    endomorphy: parseFloat(Math.max(0.1, endo).toFixed(1)),
-    mesomorphy: parseFloat(Math.max(0.1, meso).toFixed(1)),
-    ectomorphy: parseFloat(Math.max(0.1, ecto).toFixed(1)),
+    endomorphy: parseFloat(safeEndo.toFixed(1)),
+    mesomorphy: parseFloat(safeMeso.toFixed(1)),
+    ectomorphy: parseFloat(safeEcto.toFixed(1)),
     classification
   };
 };
