@@ -40,21 +40,23 @@ export const getAIInsights = async (current: Evaluation, client: Client, history
   }
 };
 
-export const getSuggestedTraining = async (evaluation: Evaluation, client: Client) => {
+export const getSuggestedTraining = async (evaluation: Evaluation, client: Client, splitLetter: string = 'A') => {
   const prompt = `
-    Como um Personal Trainer de elite, crie um programa de treinamento personalizado em JSON para este cliente.
-    O programa deve obrigatoriamente ser dividido em 3 ETAPAS: 'Preparação' (aquecimento/mobilidade), 'Principal' (força/foco) e 'Finalização' (cardio/flexibilidade).
+    Como um Personal Trainer de elite, crie um programa de treinamento personalizado para a FICHA ${splitLetter} de um split ${client.targetSplit || 'ABC'}.
+    O programa deve obrigatoriamente ser dividido em 3 ETAPAS: 'Preparação', 'Principal' e 'Finalização'.
     
     CLIENTE: ${client.name}, ${client.gender}, ${evaluation.ageAtEvaluation} anos
-    OBJETIVO: Perda de peso e melhora do condicionamento (VO2: ${evaluation.functional?.vo2Max?.toFixed(1)}).
-    FAT MASS: ${evaluation.bodyFat.toFixed(1)}%
+    DIVISÃO ALVO: Ficha ${splitLetter} de um programa ${client.targetSplit || 'ABC'}.
+    OBJETIVO: Baseado no BF de ${evaluation.bodyFat.toFixed(1)}% e VO2 de ${evaluation.functional?.vo2Max?.toFixed(1)}.
     LIMITAÇÕES: ${evaluation.anamnesis.injuries || 'Nenhuma'}
+    
+    Exemplo: Se for ficha A de um ABC, foque em um agrupamento específico (ex: Peito/Tríceps ou Pernas).
     
     O JSON deve seguir este formato estrito:
     {
-      "title": "Nome do Programa",
+      "title": "Nome Sugerido para esta Ficha (ex: Peitoral e Deltoides)",
       "level": "Iniciante" | "Intermediário" | "Avançado",
-      "description": "Justificativa curta baseada nos dados",
+      "description": "Justificativa curta da escolha dos exercícios para a Ficha ${splitLetter}",
       "exercises": [
         {"name": "Exercício", "sets": "3", "reps": "12", "rest": "60s", "stage": "Preparação" | "Principal" | "Finalização"}
       ]
@@ -107,11 +109,7 @@ export const auditTrainingProgram = async (program: Partial<TrainingProgram>, cl
     TREINO: ${program.title}
     EXERCÍCIOS: ${JSON.stringify(program.exercises?.map(e => ({ name: e.name, stage: e.stage, sets: e.sets, reps: e.reps })))}
     
-    Verifique:
-    1. O volume de séries é adequado para o nível ${program.level}?
-    2. Os exercícios condizem com a letra ${program.splitLetter} (Ex: Peito no treino A, Perna no C)?
-    3. Existem fases de Preparação e Finalização?
-    4. Há algum risco biomecânico óbvio?
+    Verifique se os exercícios condizem com a letra ${program.splitLetter} (Ex: Peito no treino A, Perna no C) considerando o split ${program.splitType}.
     
     Responda em um formato de tópicos curto e direto em português.
   `;
@@ -135,14 +133,11 @@ export const generateEvolutionEmail = async (client: Client, lastEval: Evaluatio
     DADOS DA ÚLTIMA AVALIAÇÃO:
     - Peso: ${lastEval.weight}kg
     - Gordura Corporal: ${lastEval.bodyFat.toFixed(1)}%
-    - Massa Magra: ${lastEval.leanMass.toFixed(1)}kg
-    - VO2 Max: ${lastEval.functional?.vo2Max?.toFixed(1) || '---'}
     
     TREINOS ATIVOS:
-    ${training.map(t => `- ${t.title} (Ficha ${t.splitLetter})`).join('\n')}
+    ${training.map(t => `- Ficha ${t.splitLetter}: ${t.title}`).join('\n')}
     
-    O e-mail deve ser motivador, destacar os pontos positivos e desejar continuidade nos treinos. 
-    Use uma linguagem profissional e empática. Não use Markdown complexo, apenas parágrafos.
+    O e-mail deve ser motivador. Não use Markdown complexo.
   `;
 
   try {

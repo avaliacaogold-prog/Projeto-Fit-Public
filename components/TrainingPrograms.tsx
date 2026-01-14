@@ -97,7 +97,7 @@ const TrainingPrograms: React.FC<TrainingProgramsProps> = ({
             id: Math.random().toString(36).substr(2, 9),
             clientId: selectedClientId,
             programId: program.id,
-            programTitle: `Treino ${program.splitLetter}`,
+            programTitle: `Ficha ${program.splitLetter}`,
             date: formatDateSafe(currentDate),
             status: 'scheduled'
           });
@@ -137,7 +137,7 @@ const TrainingPrograms: React.FC<TrainingProgramsProps> = ({
       id: Math.random().toString(36).substr(2, 9),
       clientId: selectedClientId,
       programId: program.id,
-      programTitle: `Treino ${program.splitLetter}`,
+      programTitle: `Ficha ${program.splitLetter}`,
       date: dateStr,
       status: 'scheduled'
     });
@@ -252,6 +252,18 @@ const TrainingPrograms: React.FC<TrainingProgramsProps> = ({
     </div>
   );
 
+  const getSplitColor = (letter: string) => {
+    const colors: Record<string, string> = {
+      'A': 'bg-indigo-600 shadow-indigo-200',
+      'B': 'bg-emerald-600 shadow-emerald-200',
+      'C': 'bg-amber-600 shadow-amber-200',
+      'D': 'bg-rose-600 shadow-rose-200',
+      'E': 'bg-sky-600 shadow-sky-200',
+      'F': 'bg-violet-600 shadow-violet-200'
+    };
+    return colors[letter] || 'bg-slate-600';
+  };
+
   return (
     <div className="space-y-8 pb-10">
       <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm flex flex-col md:flex-row justify-between items-center gap-6 no-print">
@@ -263,13 +275,13 @@ const TrainingPrograms: React.FC<TrainingProgramsProps> = ({
           </div>
         </div>
         <div className="w-full md:w-auto flex flex-col gap-2">
-           <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-2">Filtrar por Aluno</label>
+           <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-2">Aluno Selecionado</label>
            <select 
              className="w-full md:w-80 px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-base outline-none focus:ring-2 focus:ring-indigo-500 transition-all shadow-sm"
              value={selectedClientId}
              onChange={(e) => setSelectedClientId(e.target.value)}
            >
-             <option value="">Todos os Alunos...</option>
+             <option value="">Selecionar Aluno...</option>
              {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
            </select>
         </div>
@@ -330,7 +342,7 @@ const TrainingPrograms: React.FC<TrainingProgramsProps> = ({
             {clientPrograms.map(p => (
                <div key={p.id} className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm space-y-6 hover:border-indigo-500 transition-all group">
                   <div className="flex justify-between items-start">
-                     <span className="bg-indigo-600 text-white px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-indigo-100">Ficha {p.splitLetter}</span>
+                     <span className={`${getSplitColor(p.splitLetter || 'A')} text-white px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg`}>Ficha {p.splitLetter}</span>
                      <div className="flex gap-2">
                         <button className="p-3 bg-slate-50 text-slate-500 rounded-xl hover:bg-indigo-600 hover:text-white transition-all border border-slate-100">✏️</button>
                         <button onClick={() => onDeleteProgram(p.id)} className="p-3 bg-slate-50 text-rose-500 rounded-xl hover:bg-rose-500 hover:text-white transition-all border border-slate-100">🗑️</button>
@@ -356,7 +368,7 @@ const TrainingPrograms: React.FC<TrainingProgramsProps> = ({
             {selectedClientId && clientPrograms.length === 0 && (
                <div className="col-span-full py-32 text-center opacity-30 border-2 border-dashed border-slate-200 rounded-[3rem] bg-white">
                   <p className="text-base font-black uppercase tracking-widest">Nenhuma ficha técnica disponível</p>
-                  <p className="text-[10px] font-bold mt-2">Os programas de treinamento aparecerão aqui após a prescrição.</p>
+                  <p className="text-[10px] font-bold mt-2">Gere fichas no módulo de Avaliação ou adicione manualmente.</p>
                </div>
             )}
          </div>
@@ -397,15 +409,15 @@ const TrainingPrograms: React.FC<TrainingProgramsProps> = ({
                 </div>
                 <div className="space-y-4">
                    <div className="flex justify-between items-center px-2">
-                      <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Sequência (Split)</p>
-                      <button onClick={handleAutoFillSequence} className="text-[10px] font-black text-indigo-600 uppercase underline decoration-2 underline-offset-4">Auto-Fill Split</button>
+                      <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Sequência de Fichas (Split)</p>
+                      <button onClick={handleAutoFillSequence} className="text-[10px] font-black text-indigo-600 uppercase underline decoration-2 underline-offset-4">Carregar Fichas Atuais</button>
                    </div>
                    <div className="flex flex-wrap gap-2 p-4 bg-slate-50 rounded-2xl border-2 border-slate-200 border-dashed min-h-[60px]">
                       {autoPopulateData.sequence.map((id, idx) => {
                          const p = programs.find(item => item.id === id);
                          return (
-                            <div key={idx} className="bg-indigo-600 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase shadow-sm">
-                               {p?.splitLetter || '?'}
+                            <div key={idx} className={`${getSplitColor(p?.splitLetter || 'A')} text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase shadow-sm`}>
+                               Ficha {p?.splitLetter || '?'}
                             </div>
                          );
                       })}
@@ -416,6 +428,61 @@ const TrainingPrograms: React.FC<TrainingProgramsProps> = ({
              </div>
           </div>
         </div>
+      )}
+
+      {/* DETALHES DO PROGRAMA MODAL */}
+      {detailsProgram && (
+         <div className="fixed inset-0 bg-slate-900/95 backdrop-blur-xl z-[600] overflow-y-auto p-6 md:p-12 animate-in fade-in zoom-in">
+            <div className="max-w-4xl mx-auto space-y-12">
+               <div className="flex justify-between items-start border-b-8 border-slate-800 pb-10">
+                  <div>
+                    <span className={`${getSplitColor(detailsProgram.splitLetter || 'A')} text-white px-5 py-2 rounded-xl text-[12px] font-black uppercase tracking-widest shadow-xl`}>FICHA {detailsProgram.splitLetter}</span>
+                    <h2 className="text-4xl md:text-5xl font-black text-white uppercase tracking-tighter mt-6">{detailsProgram.title}</h2>
+                    <p className="text-slate-500 text-lg font-medium mt-2">{detailsProgram.description}</p>
+                  </div>
+                  <button onClick={() => setDetailsProgram(null)} className="text-slate-600 hover:text-white text-6xl leading-none transition-colors">&times;</button>
+               </div>
+
+               <div className="space-y-12 pb-20">
+                  {['Preparação', 'Principal', 'Finalização'].map(stage => {
+                     const stageExercises = detailsProgram.exercises.filter(ex => ex.stage === stage);
+                     if (stageExercises.length === 0) return null;
+                     
+                     return (
+                        <div key={stage} className="space-y-6">
+                           <h5 className="text-[11px] font-black text-indigo-400 uppercase tracking-[0.4em] flex items-center gap-4">
+                              <div className="w-2 h-2 bg-indigo-500 rounded-full"></div> {stage}
+                           </h5>
+                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              {stageExercises.map((ex, idx) => (
+                                 <div key={idx} className="bg-white/5 border border-white/10 p-8 rounded-[2rem] flex justify-between items-center group hover:bg-white/10 transition-all">
+                                    <div>
+                                       <p className="text-white font-black text-xl leading-tight mb-2">{ex.name}</p>
+                                       <div className="flex gap-4">
+                                          <div className="flex flex-col">
+                                             <span className="text-[8px] font-black text-slate-500 uppercase">Séries</span>
+                                             <span className="text-indigo-400 font-black text-sm">{ex.sets}</span>
+                                          </div>
+                                          <div className="flex flex-col">
+                                             <span className="text-[8px] font-black text-slate-500 uppercase">Reps</span>
+                                             <span className="text-indigo-400 font-black text-sm">{ex.reps}</span>
+                                          </div>
+                                          <div className="flex flex-col">
+                                             <span className="text-[8px] font-black text-slate-500 uppercase">Descanso</span>
+                                             <span className="text-indigo-400 font-black text-sm">{ex.rest}</span>
+                                          </div>
+                                       </div>
+                                    </div>
+                                    <div className="text-3xl opacity-20 group-hover:opacity-100 transition-opacity">🏋️</div>
+                                 </div>
+                              ))}
+                           </div>
+                        </div>
+                     );
+                  })}
+               </div>
+            </div>
+         </div>
       )}
     </div>
   );

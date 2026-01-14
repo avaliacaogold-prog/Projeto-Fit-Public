@@ -78,6 +78,7 @@ const EvaluationSystem: React.FC<EvaluationSystemProps> = ({ clients, evaluation
   const [viewingEval, setViewingEval] = useState<Evaluation | null>(null);
   const [isCalculating, setIsCalculating] = useState(false);
   const [isGeneratingTraining, setIsGeneratingTraining] = useState(false);
+  const [selectedSplitLetter, setSelectedSplitLetter] = useState('A');
 
   // Estados locais para bioimpedância
   const [bioFatPercent, setBioFatPercent] = useState(0);
@@ -122,7 +123,7 @@ const EvaluationSystem: React.FC<EvaluationSystemProps> = ({ clients, evaluation
     if (!viewingEval || !client || !onAddTrainingProgram) return;
     setIsGeneratingTraining(true);
     try {
-      const suggested = await getSuggestedTraining(viewingEval, client);
+      const suggested = await getSuggestedTraining(viewingEval, client, selectedSplitLetter);
       if (suggested) {
         const newProgram: TrainingProgram = {
           id: Math.random().toString(36).substr(2, 9),
@@ -131,7 +132,7 @@ const EvaluationSystem: React.FC<EvaluationSystemProps> = ({ clients, evaluation
           title: suggested.title,
           level: suggested.level,
           splitType: client.targetSplit || 'ABC',
-          splitLetter: 'A',
+          splitLetter: selectedSplitLetter,
           description: suggested.description,
           exercises: suggested.exercises.map((ex: any) => ({
             ...ex,
@@ -140,7 +141,7 @@ const EvaluationSystem: React.FC<EvaluationSystemProps> = ({ clients, evaluation
           createdAt: new Date().toISOString()
         };
         onAddTrainingProgram(newProgram);
-        alert("Programa sugerido com sucesso!");
+        alert(`Ficha ${selectedSplitLetter} sugerida com sucesso!`);
       }
     } catch (error) {
       alert("Houve um erro técnico ao processar a prescrição via inteligência artificial.");
@@ -256,6 +257,11 @@ const EvaluationSystem: React.FC<EvaluationSystemProps> = ({ clients, evaluation
         classification: e.functional.vo2Classification || '---'
       }));
   }, [selectedClientId, evaluations]);
+
+  const splitOptions = useMemo(() => {
+    if (!client?.targetSplit) return ['A'];
+    return client.targetSplit.split('').filter(char => char !== ' ');
+  }, [client]);
 
   return (
     <div className="space-y-8">
@@ -506,7 +512,7 @@ const EvaluationSystem: React.FC<EvaluationSystemProps> = ({ clients, evaluation
         </div>
       )}
 
-      {/* VIEW REPORT MODAL - Mantenho inalterado por brevidade, assumindo que as melhorias de CSS globais resolvem */}
+      {/* VIEW REPORT MODAL */}
       {viewingEval && (
         <div className="fixed inset-0 bg-white z-[500] overflow-y-auto thin-scrollbar p-6 md:p-12 print:p-0 animate-in slide-in-from-right duration-500">
            <div className="max-w-5xl mx-auto space-y-16 print:space-y-10">
@@ -516,6 +522,16 @@ const EvaluationSystem: React.FC<EvaluationSystemProps> = ({ clients, evaluation
                     <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.4em] mt-3">ID: {viewingEval.id.toUpperCase()} | {new Date(viewingEval.date).toLocaleDateString('pt-BR')}</p>
                  </div>
                  <div className="flex flex-wrap gap-4 no-print items-center">
+                    <div className="flex items-center gap-2 bg-slate-100 p-2 rounded-2xl">
+                       <span className="text-[9px] font-black uppercase text-slate-500 ml-2">DIVISÃO:</span>
+                       <select 
+                         className="bg-white px-3 py-2 rounded-xl text-[10px] font-black outline-none"
+                         value={selectedSplitLetter}
+                         onChange={(e) => setSelectedSplitLetter(e.target.value)}
+                       >
+                          {splitOptions.map(opt => <option key={opt} value={opt}>Ficha {opt}</option>)}
+                       </select>
+                    </div>
                     <button 
                       onClick={generateTraining}
                       disabled={isGeneratingTraining}
