@@ -20,7 +20,7 @@ interface TrainingProgramsProps {
   initialClientId?: string | null;
 }
 
-type AgendaView = 'weekly' | 'monthly' | 'annual';
+type AgendaView = 'daily' | 'weekly' | 'monthly' | 'annual';
 
 const TrainingPrograms: React.FC<TrainingProgramsProps> = ({ 
   clients, programs, workoutLogs, 
@@ -179,11 +179,14 @@ const TrainingPrograms: React.FC<TrainingProgramsProps> = ({
 
   const navigate = (amount: number) => {
     const next = new Date(viewDate);
-    if (agendaView === 'weekly') next.setDate(next.getDate() + (amount * 7));
+    if (agendaView === 'daily') next.setDate(next.getDate() + amount);
+    else if (agendaView === 'weekly') next.setDate(next.getDate() + (amount * 7));
     else if (agendaView === 'monthly') next.setMonth(next.getMonth() + amount);
     else next.setFullYear(next.getFullYear() + amount);
     setViewDate(next);
   };
+
+  const resetToToday = () => setViewDate(new Date());
 
   const getDaysInMonth = (month: number, year: number) => {
     const date = new Date(year, month, 1);
@@ -193,6 +196,60 @@ const TrainingPrograms: React.FC<TrainingProgramsProps> = ({
       date.setDate(date.getDate() + 1);
     }
     return days;
+  };
+
+  const renderDailyView = () => {
+    const dateStr = formatDateSafe(viewDate);
+    const dayLogs = filteredLogs.filter(l => l.date === dateStr);
+    
+    return (
+      <div className="bg-white rounded-[2.5rem] border border-slate-200 p-10 shadow-sm animate-in zoom-in duration-300 min-h-[400px]">
+        <div className="flex flex-col items-center justify-center h-full">
+          {dayLogs.length > 0 ? (
+            <div className="w-full space-y-6">
+              <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Atividades Programadas</h4>
+              {dayLogs.map(log => {
+                const program = programs.find(p => p.id === log.programId);
+                return (
+                  <div key={log.id} className="bg-slate-50 p-8 rounded-[2rem] border border-slate-100 flex justify-between items-center group hover:border-indigo-500 transition-all">
+                    <div className="flex items-center gap-6">
+                      <div className="w-16 h-16 bg-indigo-600 rounded-2xl flex items-center justify-center text-white text-xl font-black shadow-lg">
+                        {program?.splitLetter || 'T'}
+                      </div>
+                      <div>
+                        <p className="font-black text-slate-800 text-lg">{program?.title || log.programTitle}</p>
+                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">{program?.exercises.length || 0} Exercícios • {program?.level || 'Nível não definido'}</p>
+                      </div>
+                    </div>
+                    <div className="flex gap-3">
+                      <button onClick={() => setDetailsProgram(program || null)} className="bg-white border border-slate-200 px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-900 hover:text-white transition-all">Ver Ficha</button>
+                      <button onClick={() => onDeleteLog(log.id)} className="bg-rose-50 text-rose-500 p-3 rounded-xl hover:bg-rose-500 hover:text-white transition-all">🗑️</button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="text-center opacity-30 space-y-6 py-12">
+              <div className="text-7xl">🧘</div>
+              <div>
+                <p className="text-lg font-black text-slate-800 uppercase tracking-tighter">Dia de Descanso ou Sem Registro</p>
+                <p className="text-sm font-medium text-slate-500 mt-2">Nenhum treinamento clínico foi agendado para esta data.</p>
+              </div>
+              <button 
+                onClick={() => {
+                  const prog = clientPrograms[0];
+                  if(prog) handleScheduleWorkout(dateStr, prog.id);
+                }}
+                className="bg-indigo-600 text-white px-8 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest hover:scale-105 transition-all opacity-100 shadow-xl"
+              >
+                + Agendar Agora
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    );
   };
 
   const renderMonthlyView = () => {
@@ -344,26 +401,40 @@ const TrainingPrograms: React.FC<TrainingProgramsProps> = ({
 
       {activeTab === 'calendar' && (
         <div className="space-y-6">
-          <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm no-print">
-            <div className="flex bg-slate-50 p-1 rounded-xl">
-               {(['weekly', 'monthly', 'annual'] as AgendaView[]).map(v => (
-                 <button key={v} onClick={() => setAgendaView(v)} className={`px-5 py-2 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${agendaView === v ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400'}`}>{v === 'weekly' ? 'Semana' : v === 'monthly' ? 'Mês' : 'Ano'}</button>
+          <div className="flex flex-col lg:flex-row justify-between items-center gap-6 bg-white p-6 rounded-[2.5rem] border border-slate-200 shadow-sm no-print">
+            <div className="flex flex-wrap bg-slate-100 p-1.5 rounded-2xl">
+               {(['daily', 'weekly', 'monthly', 'annual'] as AgendaView[]).map(v => (
+                 <button 
+                  key={v} 
+                  onClick={() => setAgendaView(v)} 
+                  className={`px-6 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${agendaView === v ? 'bg-white text-indigo-600 shadow-md scale-105' : 'text-slate-400 hover:text-slate-600'}`}
+                >
+                  {v === 'daily' ? 'Dia' : v === 'weekly' ? 'Semana' : v === 'monthly' ? 'Mês' : 'Ano'}
+                </button>
                ))}
             </div>
-            <div className="flex items-center gap-4 bg-slate-50 px-6 py-2 rounded-2xl">
-               <button onClick={() => navigate(-1)} className="p-2 text-slate-400 hover:text-indigo-600 font-black">←</button>
-               <span className="text-[10px] font-black uppercase tracking-widest text-slate-600 min-w-[140px] text-center">
-                 {agendaView === 'weekly' && `Semana de ${viewDate.toLocaleDateString('pt-BR', {day: 'numeric', month: 'short'})}`}
-                 {agendaView === 'monthly' && `${monthNames[viewDate.getMonth()]} ${viewDate.getFullYear()}`}
-                 {agendaView === 'annual' && viewDate.getFullYear()}
-               </span>
-               <button onClick={() => navigate(1)} className="p-2 text-slate-400 hover:text-indigo-600 font-black">→</button>
+            
+            <div className="flex items-center gap-5">
+               <button onClick={resetToToday} className="bg-slate-50 border border-slate-100 px-5 py-2.5 rounded-xl text-[9px] font-black uppercase text-slate-400 hover:bg-indigo-50 hover:text-indigo-600 transition-all">Hoje</button>
+               <div className="flex items-center gap-4 bg-slate-900 px-6 py-2.5 rounded-2xl shadow-xl">
+                  <button onClick={() => navigate(-1)} className="text-white hover:text-indigo-400 font-black text-lg p-1">←</button>
+                  <span className="text-[10px] font-black uppercase tracking-[0.1em] text-white min-w-[160px] text-center">
+                    {agendaView === 'daily' && viewDate.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}
+                    {agendaView === 'weekly' && `Semana de ${viewDate.toLocaleDateString('pt-BR', {day: 'numeric', month: 'short'})}`}
+                    {agendaView === 'monthly' && `${monthNames[viewDate.getMonth()]} ${viewDate.getFullYear()}`}
+                    {agendaView === 'annual' && viewDate.getFullYear()}
+                  </span>
+                  <button onClick={() => navigate(1)} className="text-white hover:text-indigo-400 font-black text-lg p-1">→</button>
+               </div>
             </div>
-            <button onClick={() => setIsAutoPopulateOpen(true)} className="bg-emerald-50 text-emerald-600 px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-100 transition-all border border-emerald-100">⚙️ Gerador de Ciclo</button>
+
+            <button onClick={() => setIsAutoPopulateOpen(true)} className="bg-emerald-600 text-white px-8 py-3.5 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-lg">⚙️ Gerador de Ciclo</button>
           </div>
 
+          {agendaView === 'daily' && renderDailyView()}
+
           {agendaView === 'weekly' && (
-            <div className="grid grid-cols-1 md:grid-cols-7 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-7 gap-4 animate-in fade-in duration-500">
               {weekDays.map((day, idx) => {
                 const today = new Date();
                 const firstDayOfWeek = new Date(viewDate);
@@ -375,10 +446,10 @@ const TrainingPrograms: React.FC<TrainingProgramsProps> = ({
                 const logsForDay = filteredLogs.filter(l => l.date === dateStr);
                 
                 return (
-                  <div key={day} className={`bg-white rounded-3xl border ${targetDate.toDateString() === today.toDateString() ? 'border-indigo-300 ring-4 ring-indigo-50' : 'border-slate-200'} p-6 flex flex-col min-h-[350px]`}>
+                  <div key={day} className={`bg-white rounded-3xl border ${targetDate.toDateString() === today.toDateString() ? 'border-indigo-400 ring-4 ring-indigo-50 shadow-lg' : 'border-slate-100 shadow-sm'} p-6 flex flex-col min-h-[350px] transition-all hover:scale-[1.02]`}>
                     <div className="flex justify-between items-start mb-4">
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{day}</p>
-                      <span className="text-[9px] font-bold text-slate-300">{targetDate.getDate()}</span>
+                      <p className={`text-[10px] font-black uppercase tracking-widest ${targetDate.toDateString() === today.toDateString() ? 'text-indigo-600' : 'text-slate-400'}`}>{day}</p>
+                      <span className={`text-[10px] font-black ${targetDate.toDateString() === today.toDateString() ? 'bg-indigo-600 text-white w-6 h-6 flex items-center justify-center rounded-lg' : 'text-slate-300'}`}>{targetDate.getDate()}</span>
                     </div>
                     <div className="flex-1 space-y-3">
                       {logsForDay.map(log => (
@@ -388,7 +459,7 @@ const TrainingPrograms: React.FC<TrainingProgramsProps> = ({
                         </div>
                       ))}
                     </div>
-                    <select className="mt-4 w-full p-2 bg-slate-50 border border-slate-100 rounded-xl text-[9px] font-black uppercase outline-none" onChange={(e) => { if(e.target.value) handleScheduleWorkout(dateStr, e.target.value); e.target.value = ''; }} defaultValue=""><option value="" disabled>+ Prescrever</option>{clientPrograms.map(p => <option key={p.id} value={p.id}>{p.splitLetter} - {p.title}</option>)}</select>
+                    <select className="mt-4 w-full p-2.5 bg-slate-50 border border-slate-100 rounded-xl text-[9px] font-black uppercase outline-none focus:border-indigo-400 transition-all" onChange={(e) => { if(e.target.value) handleScheduleWorkout(dateStr, e.target.value); e.target.value = ''; }} defaultValue=""><option value="" disabled>+ Prescrever</option>{clientPrograms.map(p => <option key={p.id} value={p.id}>{p.splitLetter} - {p.title}</option>)}</select>
                   </div>
                 );
               })}
@@ -426,7 +497,7 @@ const TrainingPrograms: React.FC<TrainingProgramsProps> = ({
                         <button key={i} onClick={() => {
                           const days = autoPopulateData.trainingDays.includes(i) ? autoPopulateData.trainingDays.filter(x => x !== i) : [...autoPopulateData.trainingDays, i];
                           setAutoPopulateData({...autoPopulateData, trainingDays: days});
-                        }} className={`flex-1 py-4 rounded-xl text-[9px] font-black uppercase ${autoPopulateData.trainingDays.includes(i) ? 'bg-indigo-600 text-white' : 'bg-slate-50 text-slate-400'}`}>{d}</button>
+                        }} className={`flex-1 py-4 rounded-xl text-[9px] font-black uppercase ${autoPopulateData.trainingDays.includes(i) ? 'bg-indigo-600 text-white shadow-lg' : 'bg-slate-50 text-slate-400'}`}>{d}</button>
                       ))}
                    </div>
                 </div>

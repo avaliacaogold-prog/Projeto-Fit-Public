@@ -1,8 +1,9 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Evaluation, Client, EvaluationProtocol, Skinfolds, Perimeters, ProfessionalProfile } from '../types';
-import { getAIInsights } from '../services/geminiService';
+import { Evaluation, Client, EvaluationProtocol, Skinfolds, Perimeters, ProfessionalProfile, TrainingProgram } from '../types';
+import { getAIInsights, getSuggestedTraining } from '../services/geminiService';
 import { calculateBodyFat, calculateVO2Max, getVO2Classification, calculateAge, calculateSomatotype, calculateTDEE } from '../services/fitnessCalculations';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from 'recharts';
 
 interface EvaluationSystemProps {
   clients: Client[];
@@ -11,6 +12,7 @@ interface EvaluationSystemProps {
   onAddEvaluation: (evaluation: Evaluation) => void;
   onUpdateEvaluation: (evaluation: Evaluation) => void;
   onDeleteEvaluation: (id: string) => void;
+  onAddTrainingProgram?: (program: TrainingProgram) => void;
 }
 
 const STEPS = [
@@ -48,13 +50,40 @@ const PERIMETER_LABELS: Record<string, string> = {
   calf: 'Panturrilha'
 };
 
-const EvaluationSystem: React.FC<EvaluationSystemProps> = ({ clients, evaluations, profile, onAddEvaluation, onUpdateEvaluation, onDeleteEvaluation }) => {
+const CustomVO2Tooltip = ({ active, payload, label }: any) => {
+  if (active && payload && payload.length) {
+    const data = payload[0].payload;
+    return (
+      <div className="bg-white p-5 rounded-[2rem] shadow-2xl border border-slate-100 animate-in zoom-in duration-200">
+        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{label}</p>
+        <div className="flex items-center gap-2 mb-1">
+          <span className="text-xl font-black text-slate-800">{data.vo2.toFixed(1)}</span>
+          <span className="text-[9px] font-bold text-slate-400 uppercase">ml/kg/min</span>
+        </div>
+        <div className="flex items-center gap-2">
+           <div className={`w-2 h-2 rounded-full ${data.vo2 > 45 ? 'bg-emerald-500' : 'bg-amber-500'}`}></div>
+           <p className="text-[10px] font-black text-indigo-600 uppercase tracking-tight">{data.classification}</p>
+        </div>
+      </div>
+    );
+  }
+  return null;
+};
+
+const EvaluationSystem: React.FC<EvaluationSystemProps> = ({ clients, evaluations, profile, onAddEvaluation, onUpdateEvaluation, onDeleteEvaluation, onAddTrainingProgram }) => {
   const [selectedClientId, setSelectedClientId] = useState('');
   const [activeStep, setActiveStep] = useState('anamnesis');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingEvalId, setEditingEvalId] = useState<string | null>(null);
   const [viewingEval, setViewingEval] = useState<Evaluation | null>(null);
   const [isCalculating, setIsCalculating] = useState(false);
+  const [isGeneratingTraining, setIsGeneratingTraining] = useState(false);
+
+  // Estados locais para bioimpedância
+  const [bioFatPercent, setBioFatPercent] = useState(0);
+  const [bioVisceralFat, setBioVisceralFat] = useState(0);
+  const [bioWaterPercent, setBioWaterPercent] = useState(0);
+  const [bioExtraNotes, setBioExtraNotes] = useState('');
 
   const initialFormState: Partial<Evaluation> = {
     date: new Date().toISOString().split('T')[0],
@@ -70,14 +99,56 @@ const EvaluationSystem: React.FC<EvaluationSystemProps> = ({ clients, evaluation
   };
 
   const [formData, setFormData] = useState<Partial<Evaluation>>(initialFormState);
-  const client = clients.find(c => c.id === selectedClientId);
+  const client = clients.find(c => c.id === selectedClientId || c.id === viewingEval?.clientId);
 
   const handleEdit = (ev: Evaluation) => {
     setFormData(ev);
     setEditingEvalId(ev.id);
     setSelectedClientId(ev.clientId);
+    setBioFatPercent(ev.protocol === 'Bioimpedance' ? ev.bodyFat : 0);
+    // Tenta extrair notas de bioimpedância se existirem
+    if (ev.protocol === 'Bioimpedance' && ev.notes.includes('[Bioimpedância]')) {
+        const parts = ev.notes.split('Observações Adicionais:');
+        if (parts.length > 1) {
+            setBioExtraNotes(parts[1].trim());
+        }
+    } else {
+        setBioExtraNotes('');
+    }
     setIsFormOpen(true);
     setActiveStep('anamnesis');
+  };
+
+  const generateTraining = async () => {
+    if (!viewingEval || !client || !onAddTrainingProgram) return;
+    setIsGeneratingTraining(true);
+    try {
+      const suggested = await getSuggestedTraining(viewingEval, client);
+      if (suggested) {
+        const newProgram: TrainingProgram = {
+          id: Math.random().toString(36).substr(2, 9),
+          clientId: client.id,
+          clientName: client.name,
+          title: suggested.title,
+          level: suggested.level,
+          splitType: client.targetSplit || 'ABC',
+          splitLetter: 'A',
+          description: suggested.description,
+          exercises: suggested.exercises.map((ex: any) => ({
+            ...ex,
+            id: Math.random().toString(36).substr(2, 9)
+          })),
+          createdAt: new Date().toISOString()
+        };
+        onAddTrainingProgram(newProgram);
+        alert("Programa de treinamento sugerido pela IA gerado com sucesso! Você pode visualizá-lo na aba de Prescrição.");
+      }
+    } catch (error) {
+      console.error(error);
+      alert("Houve um erro técnico ao processar a prescrição via inteligência artificial.");
+    } finally {
+      setIsGeneratingTraining(false);
+    }
   };
 
   const handleSave = async () => {
@@ -89,15 +160,20 @@ const EvaluationSystem: React.FC<EvaluationSystemProps> = ({ clients, evaluation
       const sf = formData.skinfolds as Skinfolds;
       const pm = formData.perimeters as Perimeters;
       
-      const bf = calculateBodyFat(
-        formData.protocol as EvaluationProtocol, 
-        sf, 
-        age, 
-        client.gender, 
-        formData.weight || 0, 
-        formData.height || 0, 
-        pm
-      );
+      let bf = 0;
+      if (formData.protocol === 'Bioimpedance') {
+        bf = bioFatPercent;
+      } else {
+        bf = calculateBodyFat(
+          formData.protocol as EvaluationProtocol, 
+          sf, 
+          age, 
+          client.gender, 
+          formData.weight || 0, 
+          formData.height || 0, 
+          pm
+        );
+      }
 
       const vo2Max = calculateVO2Max(
         formData.functional?.vo2Protocol || 'Cooper',
@@ -116,6 +192,10 @@ const EvaluationSystem: React.FC<EvaluationSystemProps> = ({ clients, evaluation
 
       const tdee = calculateTDEE(bmr, formData.anamnesis?.lifestyle || 'Moderado');
 
+      const bioNotes = formData.protocol === 'Bioimpedance' 
+        ? `\n[Bioimpedância] Gordura Visceral: ${bioVisceralFat} | Água Corporal: ${bioWaterPercent}% | Observações Adicionais: ${bioExtraNotes}` 
+        : '';
+
       const finalEval: Evaluation = {
         ...(formData as Evaluation),
         id: editingEvalId || Math.random().toString(36).substr(2, 9),
@@ -132,7 +212,7 @@ const EvaluationSystem: React.FC<EvaluationSystemProps> = ({ clients, evaluation
           vo2Max, 
           vo2Classification: getVO2Classification(vo2Max, age, client.gender).status 
         },
-        notes: formData.notes || ''
+        notes: (formData.notes || '') + bioNotes
       };
 
       if (!editingEvalId) {
@@ -145,6 +225,7 @@ const EvaluationSystem: React.FC<EvaluationSystemProps> = ({ clients, evaluation
       setIsFormOpen(false);
       setEditingEvalId(null);
       setViewingEval(finalEval);
+      setBioExtraNotes('');
     } catch (error) {
       alert("Erro ao salvar avaliação. Verifique os dados inseridos.");
     } finally {
@@ -156,14 +237,27 @@ const EvaluationSystem: React.FC<EvaluationSystemProps> = ({ clients, evaluation
     const p = formData.protocol;
     const g = client?.gender;
     
+    if (p === 'Bioimpedance') return [];
     if (p === 'Pollock7') return ['chest', 'midaxillary', 'triceps', 'subscapular', 'abdominal', 'suprailiac', 'thigh'];
     if (p === 'Pollock3') return g === 'M' ? ['chest', 'abdominal', 'thigh'] : ['triceps', 'suprailiac', 'thigh'];
     if (p === 'Guedes') return g === 'M' ? ['triceps', 'suprailiac', 'abdominal'] : ['triceps', 'suprailiac', 'thigh'];
     if (p === 'Faulkner') return ['triceps', 'subscapular', 'suprailiac', 'abdominal'];
-    if (p === 'Petroski') return g === 'M' ? ['subscapular', 'triceps', 'suprailiac', 'calf'] : ['subscapular', 'triceps', 'suprailiac', 'thigh'];
+    if (p === 'Petroski') return ['subscapular', 'triceps', 'suprailiac', 'calf'];
     
     return Object.keys(formData.skinfolds || {});
   }, [formData.protocol, client?.gender]);
+
+  const vo2HistoryData = useMemo(() => {
+    if (!selectedClientId) return [];
+    return evaluations
+      .filter(e => e.clientId === selectedClientId)
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+      .map(e => ({
+        date: new Date(e.date).toLocaleDateString('pt-BR', { month: '2-digit', year: '2-digit' }),
+        vo2: e.functional.vo2Max || 0,
+        classification: e.functional.vo2Classification || '---'
+      }));
+  }, [selectedClientId, evaluations]);
 
   return (
     <div className="space-y-8">
@@ -289,24 +383,56 @@ const EvaluationSystem: React.FC<EvaluationSystemProps> = ({ clients, evaluation
                            <InputGroup label="Estatura (cm)" type="number" value={formData.height} onChange={v => setFormData({...formData, height: Number(v)})} />
                            <div className="w-full">
                               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-3 ml-2">Protocolo de Dobras</label>
-                              <select className="w-full p-5 bg-white border border-slate-200 rounded-2xl font-bold text-xs shadow-sm" value={formData.protocol} onChange={e => setFormData({...formData, protocol: e.target.value as any})}>
+                              <select 
+                                className="w-full p-5 bg-white border border-slate-200 rounded-2xl font-bold text-xs shadow-sm focus:ring-2 focus:ring-indigo-500 transition-all" 
+                                value={formData.protocol} 
+                                onChange={e => setFormData({...formData, protocol: e.target.value as any})}
+                              >
                                  <option value="Pollock7">Pollock (7 Dobras)</option>
                                  <option value="Pollock3">Pollock (3 Dobras)</option>
                                  <option value="Guedes">Guedes (3 Dobras)</option>
                                  <option value="Faulkner">Faulkner (4 Dobras)</option>
                                  <option value="Petroski">Petroski (4 Dobras)</option>
+                                 <option value="Bioimpedance">Bioimpedância (Digital)</option>
                               </select>
                            </div>
                         </div>
+
+                        {formData.protocol === 'Bioimpedance' ? (
+                          <div className="space-y-10 animate-in fade-in slide-in-from-top duration-300">
+                             <h5 className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.3em] border-b border-emerald-100 pb-3 flex items-center gap-4">
+                               <div className="w-2 h-2 bg-emerald-500 rounded-full"></div> Dados do Equipamento Bioimpedância
+                             </h5>
+                             <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                                <InputGroup label="% Gordura Corporal" type="number" value={bioFatPercent} onChange={v => setBioFatPercent(Number(v))} />
+                                <InputGroup label="Nível Gordura Visceral" type="number" value={bioVisceralFat} onChange={v => setBioVisceralFat(Number(v))} />
+                                <InputGroup label="% Água Corporal" type="number" value={bioWaterPercent} onChange={v => setBioWaterPercent(Number(v))} />
+                             </div>
+                             <div className="mt-4">
+                                <InputBox 
+                                    label="Observações Específicas dos Resultados do Exame" 
+                                    placeholder="Descreva detalhes como nível de hidratação no momento do teste, marca da balança, ou impedância segmentada..." 
+                                    textarea 
+                                    value={bioExtraNotes} 
+                                    onChange={v => setBioExtraNotes(v)} 
+                                />
+                             </div>
+                             <p className="text-[9px] font-bold text-slate-400 uppercase italic">* Os demais indicadores (Massa Magra, TMB) serão calculados automaticamente com base no peso e gordura informados.</p>
+                          </div>
+                        ) : (
+                          <div className="space-y-10">
+                             <h5 className="text-[10px] font-black text-indigo-500 uppercase tracking-[0.3em] border-b border-indigo-100 pb-3 flex items-center gap-4">
+                               <div className="w-2 h-2 bg-indigo-500 rounded-full"></div> Dobras Cutâneas (mm)
+                             </h5>
+                             <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                                {visibleFolds.map(fold => (
+                                  <InputGroup key={fold} label={SKINFOLD_LABELS[fold]} type="number" value={(formData.skinfolds as any)?.[fold]} onChange={v => setFormData({...formData, skinfolds: {...formData.skinfolds!, [fold]: Number(v)}})} />
+                                ))}
+                             </div>
+                          </div>
+                        )}
+
                         <div className="space-y-10">
-                           <h5 className="text-[10px] font-black text-indigo-500 uppercase tracking-[0.3em] border-b border-indigo-100 pb-3 flex items-center gap-4">
-                             <div className="w-2 h-2 bg-indigo-500 rounded-full"></div> Dobras Cutâneas (mm)
-                           </h5>
-                           <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-                              {visibleFolds.map(fold => (
-                                <InputGroup key={fold} label={SKINFOLD_LABELS[fold]} type="number" value={(formData.skinfolds as any)?.[fold]} onChange={v => setFormData({...formData, skinfolds: {...formData.skinfolds!, [fold]: Number(v)}})} />
-                              ))}
-                           </div>
                            <h5 className="text-[10px] font-black text-indigo-500 uppercase tracking-[0.3em] border-b border-indigo-100 pb-3 flex items-center gap-4 mt-12">
                              <div className="w-2 h-2 bg-indigo-500 rounded-full"></div> Perímetros Corporais (cm)
                            </h5>
@@ -320,26 +446,86 @@ const EvaluationSystem: React.FC<EvaluationSystemProps> = ({ clients, evaluation
                    )}
 
                    {activeStep === 'functional' && (
-                     <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-                        <div className="p-8 bg-slate-50 rounded-[2.5rem] border border-slate-100">
-                           <label className="text-[10px] font-black text-slate-400 uppercase block mb-4 tracking-widest">Avaliação Cardiovascular</label>
-                           <select className="w-full p-5 bg-white border border-slate-200 rounded-2xl font-bold text-xs" value={formData.functional?.vo2Protocol} onChange={e => setFormData({...formData, functional: {...formData.functional!, vo2Protocol: e.target.value as any}})}>
-                              <option value="Cooper">Cooper (Corrida 12 min)</option>
-                              <option value="Rockport">Rockport (Caminhada 1 Milha)</option>
-                           </select>
-                           <div className="mt-6">
-                              <InputGroup 
-                                label={formData.functional?.vo2Protocol === 'Cooper' ? 'Distância Percorrida (metros)' : 'Tempo de Conclusão (min)'} 
-                                type="number" 
-                                value={formData.functional?.testValue}
-                                onChange={v => setFormData({...formData, functional: {...formData.functional!, testValue: Number(v)}})}
-                              />
+                     <div className="space-y-12">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                           <div className="p-8 bg-slate-50 rounded-[2.5rem] border border-slate-100">
+                              <label className="text-[10px] font-black text-slate-400 uppercase block mb-4 tracking-widest">Avaliação Cardiovascular</label>
+                              <select className="w-full p-5 bg-white border border-slate-200 rounded-2xl font-bold text-xs" value={formData.functional?.vo2Protocol} onChange={e => setFormData({...formData, functional: {...formData.functional!, vo2Protocol: e.target.value as any}})}>
+                                 <option value="Cooper">Cooper (Corrida 12 min)</option>
+                                 <option value="Rockport">Rockport (Caminhada 1 Milha)</option>
+                              </select>
+                              <div className="mt-6">
+                                 <InputGroup 
+                                   label={formData.functional?.vo2Protocol === 'Cooper' ? 'Distância Percorrida (metros)' : 'Tempo de Conclusão (min)'} 
+                                   type="number" 
+                                   value={formData.functional?.testValue}
+                                   onChange={v => setFormData({...formData, functional: {...formData.functional!, testValue: Number(v)}})}
+                                 />
+                              </div>
+                           </div>
+                           <div className="space-y-6">
+                              <InputGroup label="FC ao Final do Teste" type="number" value={formData.functional?.hrFinal} onChange={v => setFormData({...formData, functional: {...formData.functional!, hrFinal: Number(v)}})} />
+                              <InputGroup label="Flexibilidade - Banco de Wells (cm)" type="number" value={formData.functional?.flexibilityTest} onChange={v => setFormData({...formData, functional: {...formData.functional!, flexibilityTest: v}})} />
                            </div>
                         </div>
-                        <div className="space-y-6">
-                           <InputGroup label="FC ao Final do Teste" type="number" value={formData.functional?.hrFinal} onChange={v => setFormData({...formData, functional: {...formData.functional!, hrFinal: Number(v)}})} />
-                           <InputGroup label="Flexibilidade - Banco de Wells (cm)" type="number" value={formData.functional?.flexibilityTest} onChange={v => setFormData({...formData, functional: {...formData.functional!, flexibilityTest: v}})} />
-                        </div>
+
+                        {/* Evolução Histórica de VO2 */}
+                        {vo2HistoryData.length > 0 && (
+                          <div className="p-10 bg-white rounded-[3rem] border border-slate-100 shadow-sm space-y-8 animate-in slide-in-from-bottom duration-500">
+                             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                                <div>
+                                   <h5 className="text-[10px] font-black text-indigo-500 uppercase tracking-[0.2em] mb-1">Análise de Tendência Funcional</h5>
+                                   <p className="text-xl font-black text-slate-800 uppercase tracking-tighter">Histórico de VO2 Máximo</p>
+                                </div>
+                                <div className="text-left sm:text-right bg-slate-50 px-6 py-4 rounded-2xl border border-slate-100">
+                                   <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Performance Longitudinal</p>
+                                   <p className="text-lg font-black text-emerald-500">{vo2HistoryData[vo2HistoryData.length - 1].vo2.toFixed(1)} <span className="text-[9px]">ml/kg/min</span></p>
+                                </div>
+                             </div>
+                             <div className="h-80 w-full overflow-hidden">
+                                <ResponsiveContainer width="100%" height="100%">
+                                   <AreaChart data={vo2HistoryData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                                      <defs>
+                                         <linearGradient id="colorVo2" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="5%" stopColor="#6366f1" stopOpacity={0.4}/>
+                                            <stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
+                                         </linearGradient>
+                                      </defs>
+                                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                                      <XAxis 
+                                         dataKey="date" 
+                                         axisLine={false} 
+                                         tickLine={false} 
+                                         tick={{fontSize: 10, fontWeight: 800, fill: '#94a3b8'}} 
+                                         dy={10}
+                                         minTickGap={20}
+                                      />
+                                      <YAxis 
+                                         axisLine={false} 
+                                         tickLine={false} 
+                                         tick={{fontSize: 10, fontWeight: 800, fill: '#94a3b8'}} 
+                                         domain={['auto', 'auto']}
+                                      />
+                                      <Tooltip 
+                                         content={<CustomVO2Tooltip />}
+                                         cursor={{ stroke: '#6366f1', strokeWidth: 2, strokeDasharray: '5 5' }}
+                                      />
+                                      <Area 
+                                         type="monotone" 
+                                         dataKey="vo2" 
+                                         stroke="#6366f1" 
+                                         strokeWidth={5} 
+                                         fillOpacity={1} 
+                                         fill="url(#colorVo2)" 
+                                         name="VO2 Max"
+                                         animationDuration={2000}
+                                         activeDot={{ r: 8, strokeWidth: 4, stroke: '#fff', fill: '#6366f1' }}
+                                      />
+                                   </AreaChart>
+                                </ResponsiveContainer>
+                             </div>
+                          </div>
+                        )}
                      </div>
                    )}
 
@@ -377,6 +563,13 @@ const EvaluationSystem: React.FC<EvaluationSystemProps> = ({ clients, evaluation
                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em] mt-3">SÉRIE: {viewingEval.id.toUpperCase()} | DATA: {new Date(viewingEval.date).toLocaleDateString('pt-BR')}</p>
                  </div>
                  <div className="flex gap-4 no-print items-center">
+                    <button 
+                      onClick={generateTraining}
+                      disabled={isGeneratingTraining}
+                      className="bg-emerald-600 text-white px-10 py-4 rounded-2xl font-black text-[11px] uppercase tracking-widest shadow-xl disabled:opacity-50 hover:bg-emerald-700 transition-all flex items-center gap-2"
+                    >
+                      {isGeneratingTraining ? 'Gerando...' : '✨ Gerar Treino Sugerido (IA)'}
+                    </button>
                     <button onClick={() => window.print()} className="bg-slate-900 text-white px-10 py-4 rounded-2xl font-black text-[11px] uppercase tracking-widest shadow-xl">Imprimir Relatório</button>
                     <button 
                       onClick={() => setViewingEval(null)} 
@@ -389,7 +582,7 @@ const EvaluationSystem: React.FC<EvaluationSystemProps> = ({ clients, evaluation
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-                 <ReportMetric label="Gordura Corporal" value={`${viewingEval.bodyFat.toFixed(1)}%`} sub="Protocolo Científico" />
+                 <ReportMetric label="Gordura Corporal" value={`${viewingEval.bodyFat.toFixed(1)}%`} sub={viewingEval.protocol === 'Bioimpedance' ? 'Bioimpedância' : 'Protocolo Científico'} />
                  <ReportMetric label="VO2 Máximo" value={viewingEval.functional.vo2Max?.toFixed(1) || '---'} sub={viewingEval.functional.vo2Classification || 'Aguardando Teste'} />
                  <ReportMetric label="Gasto Metabólico" value={`${viewingEval.tdee.toFixed(0)}`} sub="Total kcal / dia" />
                  <ReportMetric label="Somatotipia" value={viewingEval.somatotype?.classification || '---'} sub="Heath-Carter" />
@@ -402,16 +595,30 @@ const EvaluationSystem: React.FC<EvaluationSystemProps> = ({ clients, evaluation
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-20">
-                 <div className="space-y-8">
-                    <h6 className="text-xs font-black uppercase text-slate-400 tracking-[0.2em] border-b-2 border-slate-100 pb-3">Perímetros Corporais (cm)</h6>
-                    <div className="grid grid-cols-1 gap-5">
-                       {/* Fix: Cast Object.entries to [string, number][] to avoid operator '>' error on unknown type */}
-                       {(Object.entries(viewingEval.perimeters) as [string, number][]).filter(([_,v]) => v > 0).map(([k, v]) => (
-                         <div key={k} className="flex justify-between items-center bg-slate-50 p-4 rounded-2xl border border-slate-100">
-                            <span className="text-[10px] font-black text-slate-500 uppercase">{PERIMETER_LABELS[k] || k}</span>
-                            <span className="text-base font-black text-slate-800">{v} <span className="text-[10px]">cm</span></span>
+                 <div className="space-y-12">
+                    {viewingEval.protocol !== 'Bioimpedance' && (
+                      <div className="space-y-8">
+                         <h6 className="text-xs font-black uppercase text-slate-400 tracking-[0.2em] border-b-2 border-slate-100 pb-3">Composição Tecidual (Dobras mm)</h6>
+                         <div className="grid grid-cols-2 gap-5">
+                            {viewingEval.skinfolds && (Object.entries(viewingEval.skinfolds) as [string, number][]).filter(([_,v]) => v > 0).map(([k, v]) => (
+                               <div key={k} className="flex justify-between items-center bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                                  <span className="text-[10px] font-black text-slate-500 uppercase">{SKINFOLD_LABELS[k] || k}</span>
+                                  <span className="text-base font-black text-slate-800">{v} <span className="text-[10px]">mm</span></span>
+                               </div>
+                            ))}
                          </div>
-                       ))}
+                      </div>
+                    )}
+                    <div className="space-y-8">
+                       <h6 className="text-xs font-black uppercase text-slate-400 tracking-[0.2em] border-b-2 border-slate-100 pb-3">Perímetros Corporais (cm)</h6>
+                       <div className="grid grid-cols-1 gap-5">
+                          {(Object.entries(viewingEval.perimeters) as [string, number][]).filter(([_,v]) => v > 0).map(([k, v]) => (
+                            <div key={k} className="flex justify-between items-center bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                               <span className="text-[10px] font-black text-slate-500 uppercase">{PERIMETER_LABELS[k] || k}</span>
+                               <span className="text-base font-black text-slate-800">{v} <span className="text-[10px]">cm</span></span>
+                            </div>
+                          ))}
+                       </div>
                     </div>
                  </div>
                  <div className="space-y-12">

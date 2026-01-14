@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Payment, PaymentStatus, Client, PlanType } from '../types';
 
 interface FinancialManagementProps {
@@ -9,12 +9,46 @@ interface FinancialManagementProps {
   onUpdateStatus: (id: string, status: PaymentStatus) => void;
 }
 
+type PeriodFilter = 'all' | 'current_month' | 'next_30' | 'overdue';
+
 const FinancialManagement: React.FC<FinancialManagementProps> = ({ clients, payments, onAddPayment, onUpdateStatus }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState({ clientId: '', planType: 'Mensal' as PlanType, amount: '150', dueDate: new Date().toISOString().split('T')[0] });
+  
+  // Estados de Filtro
+  const [statusFilter, setStatusFilter] = useState<PaymentStatus | 'ALL'>('ALL');
+  const [periodFilter, setPeriodFilter] = useState<PeriodFilter>('all');
 
   const totalPaid = payments.filter(p => p.status === PaymentStatus.PAID).reduce((acc, curr) => acc + curr.amount, 0);
   const totalPending = payments.filter(p => p.status === PaymentStatus.PENDING).reduce((acc, curr) => acc + curr.amount, 0);
+
+  const filteredPayments = useMemo(() => {
+    return payments.filter(p => {
+      // Filtro de Status
+      if (statusFilter !== 'ALL' && p.status !== statusFilter) return false;
+
+      // Filtro de Período
+      const dueDate = new Date(p.dueDate + 'T12:00:00');
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      if (periodFilter === 'current_month') {
+        return dueDate.getMonth() === today.getMonth() && dueDate.getFullYear() === today.getFullYear();
+      }
+      
+      if (periodFilter === 'next_30') {
+        const next30 = new Date();
+        next30.setDate(today.getDate() + 30);
+        return dueDate >= today && dueDate <= next30;
+      }
+
+      if (periodFilter === 'overdue') {
+        return p.status === PaymentStatus.PENDING && dueDate < today;
+      }
+
+      return true;
+    }).sort((a, b) => new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime());
+  }, [payments, statusFilter, periodFilter]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -25,7 +59,7 @@ const FinancialManagement: React.FC<FinancialManagementProps> = ({ clients, paym
       id: Math.random().toString(36).substr(2, 9),
       clientId: client.id,
       clientName: client.name,
-      amount: parseFloat(formData.amount), // Garantindo conversão numérica
+      amount: parseFloat(formData.amount),
       dueDate: formData.dueDate,
       status: PaymentStatus.PENDING,
       planType: formData.planType,
@@ -48,13 +82,44 @@ const FinancialManagement: React.FC<FinancialManagementProps> = ({ clients, paym
       </div>
 
       <div className="bg-white rounded-[4rem] border border-slate-100 shadow-sm overflow-hidden">
-         <div className="p-10 border-b border-slate-50 flex justify-between items-center bg-slate-50/50">
-            <h4 className="font-black text-slate-900 text-xl tracking-tight uppercase">Fluxo de Caixa</h4>
-            <div className="flex gap-2">
-               <button className="px-5 py-2 bg-white border border-slate-200 rounded-full text-[10px] font-black text-slate-400 uppercase">Exportar Relatório</button>
+         <div className="p-10 border-b border-slate-50 flex flex-col md:flex-row justify-between items-center gap-6 bg-slate-50/50">
+            <div>
+               <h4 className="font-black text-slate-900 text-xl tracking-tight uppercase">Fluxo de Caixa</h4>
+               <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">Listagem de títulos e recebimentos</p>
+            </div>
+            
+            <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+               <div className="flex flex-col gap-1 flex-1 md:flex-none">
+                  <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest ml-2">Status</label>
+                  <select 
+                    className="px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-[10px] font-black uppercase outline-none focus:ring-2 focus:ring-indigo-500 transition-all min-w-[120px]"
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value as any)}
+                  >
+                    <option value="ALL">Todos os Status</option>
+                    <option value={PaymentStatus.PAID}>Liquidados (Pagos)</option>
+                    <option value={PaymentStatus.PENDING}>Em Aberto</option>
+                    <option value={PaymentStatus.CANCELED}>Cancelados</option>
+                  </select>
+               </div>
+
+               <div className="flex flex-col gap-1 flex-1 md:flex-none">
+                  <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest ml-2">Período</label>
+                  <select 
+                    className="px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-[10px] font-black uppercase outline-none focus:ring-2 focus:ring-indigo-500 transition-all min-w-[140px]"
+                    value={periodFilter}
+                    onChange={(e) => setPeriodFilter(e.target.value as PeriodFilter)}
+                  >
+                    <option value="all">Todo o Período</option>
+                    <option value="current_month">Mês Atual</option>
+                    <option value="next_30">Próximos 30 Dias</option>
+                    <option value="overdue">Atrasados</option>
+                  </select>
+               </div>
             </div>
          </div>
-         <div className="overflow-x-auto">
+
+         <div className="overflow-x-auto thin-scrollbar">
             <table className="w-full text-left">
                <thead>
                   <tr className="border-b border-slate-100">
@@ -66,7 +131,7 @@ const FinancialManagement: React.FC<FinancialManagementProps> = ({ clients, paym
                   </tr>
                </thead>
                <tbody className="divide-y divide-slate-50">
-                  {payments.map(p => (
+                  {filteredPayments.map(p => (
                      <tr key={p.id} className="hover:bg-slate-50/30 transition-colors">
                         <td className="px-10 py-8">
                            <p className="font-black text-slate-800 text-sm leading-tight">{p.clientName}</p>
@@ -75,19 +140,21 @@ const FinancialManagement: React.FC<FinancialManagementProps> = ({ clients, paym
                         <td className="px-10 py-8">
                            <span className="bg-slate-100 text-slate-500 px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest">{p.planType}</span>
                         </td>
-                        <td className="px-10 py-8 text-xs font-bold text-slate-500">{new Date(p.dueDate).toLocaleDateString('pt-BR')}</td>
+                        <td className="px-10 py-8 text-xs font-bold text-slate-500">{new Date(p.dueDate + 'T12:00:00').toLocaleDateString('pt-BR')}</td>
                         <td className="px-10 py-8 font-black text-slate-900 text-base">R$ {p.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
                         <td className="px-10 py-8 text-right">
                            {p.status === PaymentStatus.PAID ? (
                               <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-5 py-2.5 rounded-2xl border border-emerald-100 uppercase tracking-widest">Liquidado</span>
+                           ) : p.status === PaymentStatus.CANCELED ? (
+                              <span className="text-[10px] font-black text-slate-400 bg-slate-50 px-5 py-2.5 rounded-2xl border border-slate-100 uppercase tracking-widest">Cancelado</span>
                            ) : (
                               <button onClick={() => onUpdateStatus(p.id, PaymentStatus.PAID)} className="bg-slate-900 text-white px-8 py-3 rounded-2xl font-black text-[9px] uppercase tracking-widest hover:bg-emerald-600 transition-all shadow-lg">Dar Baixa</button>
                            )}
                         </td>
                      </tr>
                   ))}
-                  {payments.length === 0 && (
-                    <tr><td colSpan={5} className="p-20 text-center opacity-20 font-black uppercase text-xs">Nenhum lançamento financeiro</td></tr>
+                  {filteredPayments.length === 0 && (
+                    <tr><td colSpan={5} className="p-20 text-center opacity-20 font-black uppercase text-xs">Nenhum lançamento encontrado para os filtros aplicados</td></tr>
                   )}
                </tbody>
             </table>

@@ -127,3 +127,32 @@ export const auditTrainingProgram = async (program: Partial<TrainingProgram>, cl
     return "Falha na auditoria inteligente.";
   }
 };
+
+export const generateEvolutionEmail = async (client: Client, lastEval: Evaluation, training: TrainingProgram[]) => {
+  const prompt = `
+    Como um Personal Trainer profissional e atencioso, escreva um rascunho de e-mail para o aluno ${client.name} resumindo o progresso dele.
+    
+    DADOS DA ÚLTIMA AVALIAÇÃO:
+    - Peso: ${lastEval.weight}kg
+    - Gordura Corporal: ${lastEval.bodyFat.toFixed(1)}%
+    - Massa Magra: ${lastEval.leanMass.toFixed(1)}kg
+    - VO2 Max: ${lastEval.functional?.vo2Max?.toFixed(1) || '---'}
+    
+    TREINOS ATIVOS:
+    ${training.map(t => `- ${t.title} (Ficha ${t.splitLetter})`).join('\n')}
+    
+    O e-mail deve ser motivador, destacar os pontos positivos e desejar continuidade nos treinos. 
+    Use uma linguagem profissional e empática. Não use Markdown complexo, apenas parágrafos.
+  `;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: prompt,
+      config: { temperature: 0.7 }
+    });
+    return response.text;
+  } catch (error) {
+    return "Erro ao gerar rascunho de e-mail.";
+  }
+};

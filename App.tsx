@@ -128,7 +128,6 @@ const App: React.FC = () => {
         perimeters: { waist: 70, hips: 98, abdomen: 75, chest: 88, arm: 28, armFlexed: 30, forearm: 24, neck: 32, shoulders: 102, thigh: 55, thighProximal: 58, calf: 36 },
         skinfolds: { triceps: 12, biceps: 8, subscapular: 14, suprailiac: 16, abdominal: 18, chest: 10, thigh: 22, midaxillary: 12, calf: 14 },
         anamnesis: { medicalHistory: 'Nenhuma', medications: 'Nenhuma', allergies: 'Nenhuma', sleepQuality: 'Boa', waterIntake: 2.5, isSmoker: false, alcoholConsumption: 'Ocasional', lifestyle: 'Ativo', injuries: 'Leve desconforto no joelho esquerdo' },
-        // Fix: Added missing mandatory clinical, functional and somatotype fields for demo data
         clinical: {
           bloodPressure: '110/70',
           restingHR: 62,
@@ -251,7 +250,7 @@ const App: React.FC = () => {
     switch (activeView) {
       case 'dashboard': return <Dashboard clients={clients} evaluations={evaluations} payments={payments} onLoadDemo={handleLoadDemo} />;
       case 'clients': return <ClientManagement clients={clients} evaluations={evaluations} trainingPrograms={trainingPrograms} onAddClient={handleAddClient} onUpdateClient={handleUpdateClient} onDeleteClient={handleDeleteClient} onViewTraining={(id) => { setPreSelectedTrainingClientId(id); setActiveView('training'); }} />;
-      case 'evaluations': return <EvaluationSystem clients={clients} evaluations={evaluations} profile={profile} onAddEvaluation={handleAddEvaluation} onUpdateEvaluation={handleUpdateEvaluation} onDeleteEvaluation={handleDeleteEvaluation} />;
+      case 'evaluations': return <EvaluationSystem clients={clients} evaluations={evaluations} profile={profile} onAddEvaluation={handleAddEvaluation} onUpdateEvaluation={handleUpdateEvaluation} onDeleteEvaluation={handleDeleteEvaluation} onAddTrainingProgram={handleAddTrainingProgram} />;
       case 'training': return <TrainingPrograms clients={clients} evaluations={evaluations} programs={trainingPrograms} workoutLogs={workoutLogs} exerciseTemplates={exerciseTemplates} onAddProgram={handleAddTrainingProgram} onUpdateProgram={handleUpdateTrainingProgram} onDeleteProgram={handleDeleteTrainingProgram} onUpdateLog={handleUpdateWorkoutLog} onBulkAddLogs={handleBulkAddWorkoutLogs} onDeleteLog={handleDeleteWorkoutLog} onAddTemplate={handleAddExerciseTemplate} onDeleteTemplate={handleDeleteExerciseTemplate} initialClientId={preSelectedTrainingClientId} />;
       case 'financial': return <FinancialManagement clients={clients} payments={payments} onAddPayment={handleAddPayment} onUpdateStatus={handleUpdatePaymentStatus} />;
       case 'settings': return <Settings profile={profile} onUpdateProfile={handleUpdateProfile} />;

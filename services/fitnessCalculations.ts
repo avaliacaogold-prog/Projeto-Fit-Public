@@ -75,9 +75,9 @@ export const calculateBodyFat = (
     }
 
     if (protocol === 'Petroski') {
-      const sum = isMale 
-        ? (sf.subscapular + sf.triceps + sf.suprailiac + sf.calf)
-        : (sf.subscapular + sf.triceps + sf.suprailiac + sf.thigh);
+      // Petroski (1995) uses: Subscapular, Triceps, Suprailiac, and Calf (Panturrilha) for both genders
+      const sum = sf.subscapular + sf.triceps + sf.suprailiac + sf.calf;
+      if (sum === 0) return 0;
       const density = isMale 
         ? 1.10726863 - (0.0012836 * sum) + (0.00000168 * Math.pow(sum, 2)) - (0.00012873 * age)
         : 1.1954713 - (0.07513507 * Math.log10(sum)) - (0.00041072 * age);

@@ -1,7 +1,8 @@
 
 import React, { useState, useMemo } from 'react';
 import { Client, Evaluation, TrainingSplit, TrainingProgram } from '../types';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { generateEvolutionEmail } from '../services/geminiService';
 
 interface ClientManagementProps {
   clients: Client[];
@@ -22,6 +23,7 @@ const ClientManagement: React.FC<ClientManagementProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [isGeneratingEmail, setIsGeneratingEmail] = useState(false);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -102,6 +104,27 @@ const ClientManagement: React.FC<ClientManagementProps> = ({
 
   const handlePrint = () => {
     window.print();
+  };
+
+  const handleSendEmail = async () => {
+    if (!summaryData || !summaryData.client) return;
+    
+    const lastEval = summaryData.clientEvals[summaryData.clientEvals.length - 1];
+    if (!lastEval) return alert("O aluno precisa de pelo menos uma avaliação para gerar o resumo.");
+
+    setIsGeneratingEmail(true);
+    try {
+      const emailBody = await generateEvolutionEmail(summaryData.client, lastEval, summaryData.clientTraining);
+      const subject = encodeURIComponent(`Evolução e Performance - ${summaryData.client.name}`);
+      const body = encodeURIComponent(emailBody || '');
+      const mailtoUrl = `mailto:${summaryData.client.email}?subject=${subject}&body=${body}`;
+      
+      window.location.href = mailtoUrl;
+    } catch (error) {
+      alert("Não foi possível gerar o rascunho de e-mail.");
+    } finally {
+      setIsGeneratingEmail(false);
+    }
   };
 
   return (
@@ -189,6 +212,13 @@ const ClientManagement: React.FC<ClientManagementProps> = ({
                   <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Relatório Consolidado de Evolução</h3>
                </div>
                <div className="flex gap-4">
+                  <button 
+                    onClick={handleSendEmail} 
+                    disabled={isGeneratingEmail}
+                    className="bg-indigo-600 text-white px-8 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-900 transition-all shadow-lg flex items-center gap-2 disabled:opacity-50"
+                  >
+                    {isGeneratingEmail ? 'Gerando...' : '✉️ Enviar p/ E-mail'}
+                  </button>
                   <button onClick={handlePrint} className="bg-slate-900 text-white px-8 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-indigo-600 transition-all shadow-lg">🖨️ Gerar PDF / Imprimir</button>
                   <button onClick={() => setSummaryClientId(null)} className="text-slate-300 hover:text-rose-500 text-4xl leading-none">&times;</button>
                </div>
@@ -226,41 +256,86 @@ const ClientManagement: React.FC<ClientManagementProps> = ({
                   </div>
                </div>
 
-               {/* Gráfico de Evolução */}
+               {/* Gráfico de Evolução de Linha */}
                {summaryData.chartData.length > 1 ? (
                  <div className="space-y-6">
                     <h5 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-3">
-                       <div className="w-8 h-[2px] bg-indigo-600"></div> Curva de Progressão Antropométrica
+                       <div className="w-8 h-[2px] bg-indigo-600"></div> Curva de Progressão Antropométrica (Peso vs BF%)
                     </h5>
-                    <div className="h-72 w-full bg-slate-50 rounded-[3rem] p-10 print:bg-white print:border print:border-slate-100">
+                    <div className="h-96 w-full bg-slate-50 rounded-[3rem] p-8 md:p-12 print:bg-white print:border print:border-slate-100 shadow-inner overflow-hidden">
                        <ResponsiveContainer width="100%" height="100%">
-                          <AreaChart data={summaryData.chartData}>
-                             <defs>
-                                <linearGradient id="colorWeight" x1="0" y1="0" x2="0" y2="1">
-                                   <stop offset="5%" stopColor="#6366f1" stopOpacity={0.2}/>
-                                   <stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
-                                </linearGradient>
-                             </defs>
+                          <LineChart data={summaryData.chartData}>
                              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                             <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{fontSize: 9, fontWeight: 800, fill: '#94a3b8'}} />
-                             <YAxis axisLine={false} tickLine={false} tick={{fontSize: 9, fontWeight: 800, fill: '#94a3b8'}} />
-                             <Tooltip contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }} />
-                             <Area type="monotone" dataKey="weight" stroke="#6366f1" strokeWidth={4} fill="url(#colorWeight)" name="Peso (kg)" />
-                             <Area type="monotone" dataKey="bf" stroke="#10b981" strokeWidth={4} fill="transparent" name="Gordura (%)" />
-                          </AreaChart>
+                             <XAxis 
+                                dataKey="date" 
+                                axisLine={false} 
+                                tickLine={false} 
+                                tick={{fontSize: 10, fontWeight: 800, fill: '#94a3b8'}} 
+                                dy={10}
+                             />
+                             {/* Eixo Y Esquerdo - Peso */}
+                             <YAxis 
+                                yAxisId="left"
+                                axisLine={false} 
+                                tickLine={false} 
+                                tick={{fontSize: 10, fontWeight: 800, fill: '#6366f1'}} 
+                                label={{ value: 'Peso (kg)', angle: -90, position: 'insideLeft', offset: 0, fontSize: 10, fontWeight: 800, fill: '#6366f1' }}
+                             />
+                             {/* Eixo Y Direito - BF */}
+                             <YAxis 
+                                yAxisId="right"
+                                orientation="right"
+                                axisLine={false} 
+                                tickLine={false} 
+                                tick={{fontSize: 10, fontWeight: 800, fill: '#10b981'}} 
+                                label={{ value: 'Gordura (%)', angle: 90, position: 'insideRight', offset: 0, fontSize: 10, fontWeight: 800, fill: '#10b981' }}
+                             />
+                             <Tooltip 
+                                contentStyle={{ borderRadius: '24px', border: 'none', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.1)', padding: '20px' }}
+                                itemStyle={{ fontWeight: 800, fontSize: '12px' }}
+                             />
+                             <Legend 
+                                verticalAlign="top" 
+                                height={36}
+                                iconType="circle"
+                                wrapperStyle={{ fontWeight: 800, fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.1em' }}
+                             />
+                             <Line 
+                                yAxisId="left"
+                                type="monotone" 
+                                dataKey="weight" 
+                                stroke="#6366f1" 
+                                strokeWidth={5} 
+                                dot={{ r: 6, fill: '#6366f1', strokeWidth: 3, stroke: '#fff' }}
+                                activeDot={{ r: 8, strokeWidth: 0 }}
+                                name="Peso Corporal (kg)" 
+                                animationDuration={1500}
+                             />
+                             <Line 
+                                yAxisId="right"
+                                type="monotone" 
+                                dataKey="bf" 
+                                stroke="#10b981" 
+                                strokeWidth={5} 
+                                dot={{ r: 6, fill: '#10b981', strokeWidth: 3, stroke: '#fff' }}
+                                activeDot={{ r: 8, strokeWidth: 0 }}
+                                name="Gordura Corporal (%)" 
+                                animationDuration={1500}
+                             />
+                          </LineChart>
                        </ResponsiveContainer>
                     </div>
                  </div>
                ) : (
                  <div className="p-12 text-center bg-slate-50 rounded-[3rem] border-2 border-dashed border-slate-200 opacity-50">
-                    <p className="text-[10px] font-black uppercase text-slate-400">Gráfico de evolução requer ao menos 2 avaliações</p>
+                    <p className="text-[10px] font-black uppercase text-slate-400">Análise de tendência requer ao menos 2 avaliações históricas</p>
                  </div>
                )}
 
                {/* Histórico de Medidas */}
                <div className="space-y-6">
                   <h5 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-3">
-                     <div className="w-8 h-[2px] bg-indigo-600"></div> Histórico de Resultados
+                     <div className="w-8 h-[2px] bg-indigo-600"></div> Histórico de Resultados Detalhados
                   </h5>
                   <div className="overflow-x-auto">
                     <table className="w-full text-left">
