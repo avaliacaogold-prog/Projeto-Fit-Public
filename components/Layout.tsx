@@ -36,10 +36,13 @@ const Layout: React.FC<LayoutProps> = ({ children, activeView, setActiveView, pr
       {/* Sidebar Navigation */}
       <aside className={`fixed inset-y-0 left-0 w-72 bg-slate-900 text-white z-[110] transition-transform duration-300 transform ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'} no-print`}>
         <div className="p-8 border-b border-slate-800">
-          <h1 className="text-2xl font-black tracking-tighter flex items-center gap-3">
+          <button 
+            onClick={() => handleNav('dashboard')}
+            className="text-2xl font-black tracking-tighter flex items-center gap-3 hover:opacity-80 transition-opacity w-full text-left"
+          >
             <span className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-sm">V</span>
             VITALMETRIC<span className="text-indigo-400">PRO</span>
-          </h1>
+          </button>
           <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-2">Ciência Aplicada ao Movimento</p>
         </div>
         
@@ -85,9 +88,12 @@ const Layout: React.FC<LayoutProps> = ({ children, activeView, setActiveView, pr
         <header className="h-20 bg-white border-b border-slate-200 flex items-center justify-between px-8 md:px-12 sticky top-0 z-40 no-print">
            <button onClick={() => setIsMobileMenuOpen(true)} className="md:hidden p-2 text-slate-600">☰</button>
            <div className="hidden md:block">
-              <h2 className="text-xs font-black text-slate-400 uppercase tracking-widest">
+              <button 
+                onClick={() => handleNav('dashboard')}
+                className="text-xs font-black text-slate-400 uppercase tracking-widest hover:text-indigo-600 transition-colors"
+              >
                 VitalMetric / {activeView.toUpperCase()}
-              </h2>
+              </button>
            </div>
            <div className="flex items-center gap-4">
               <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 px-4 py-2 rounded-full">

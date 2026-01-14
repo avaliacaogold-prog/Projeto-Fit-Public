@@ -11,6 +11,19 @@ const Settings: React.FC<SettingsProps> = ({ profile, onUpdateProfile }) => {
   const [formData, setFormData] = useState<ProfessionalProfile>(profile);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
 
+  const formatPhone = (value: string) => {
+    // Remove tudo que não for número
+    const numbers = value.replace(/\D/g, '');
+    
+    // Limita a 11 dígitos
+    const limited = numbers.slice(0, 11);
+    
+    // Aplica a máscara (XX) XXXXX-XXXX
+    if (limited.length <= 2) return limited;
+    if (limited.length <= 7) return `(${limited.slice(0, 2)}) ${limited.slice(2)}`;
+    return `(${limited.slice(0, 2)}) ${limited.slice(2, 7)}-${limited.slice(7, 11)}`;
+  };
+
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
     setSaveStatus('saving');
@@ -30,6 +43,17 @@ const Settings: React.FC<SettingsProps> = ({ profile, onUpdateProfile }) => {
       };
       reader.readAsDataURL(file);
     }
+  };
+
+  const handleEmailChange = (value: string) => {
+    // Força lowercase e remove espaços
+    const sanitizedEmail = value.toLowerCase().replace(/\s/g, '');
+    setFormData({ ...formData, email: sanitizedEmail });
+  };
+
+  const handlePhoneChange = (value: string) => {
+    const maskedPhone = formatPhone(value);
+    setFormData({ ...formData, phone: maskedPhone });
   };
 
   return (
@@ -72,30 +96,32 @@ const Settings: React.FC<SettingsProps> = ({ profile, onUpdateProfile }) => {
             <SettingsInput 
               label="Nome Completo" 
               value={formData.name} 
-              onChange={v => setFormData({...formData, name: v})} 
+              onChange={(v: string) => setFormData({...formData, name: v})} 
             />
             <SettingsInput 
               label="Nº Inscrição CREF" 
               placeholder="Ex: 123456-G/SP"
               value={formData.cref} 
-              onChange={v => setFormData({...formData, cref: v})} 
+              onChange={(v: string) => setFormData({...formData, cref: v})} 
             />
             <SettingsInput 
               label="E-mail de Contato" 
               type="email"
+              placeholder="seu@email.com"
               value={formData.email} 
-              onChange={v => setFormData({...formData, email: v})} 
+              onChange={handleEmailChange} 
             />
             <SettingsInput 
               label="WhatsApp Profissional" 
+              placeholder="(00) 00000-0000"
               value={formData.phone} 
-              onChange={v => setFormData({...formData, phone: v})} 
+              onChange={handlePhoneChange} 
             />
             <div className="md:col-span-2">
               <SettingsInput 
                 label="Endereço Comercial / Unidade" 
                 value={formData.address} 
-                onChange={v => setFormData({...formData, address: v})} 
+                onChange={(v: string) => setFormData({...formData, address: v})} 
               />
             </div>
             <div className="md:col-span-2">

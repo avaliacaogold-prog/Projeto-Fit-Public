@@ -378,7 +378,13 @@ const EvaluationSystem: React.FC<EvaluationSystemProps> = ({ clients, evaluation
                  </div>
                  <div className="flex gap-4 no-print items-center">
                     <button onClick={() => window.print()} className="bg-slate-900 text-white px-10 py-4 rounded-2xl font-black text-[11px] uppercase tracking-widest shadow-xl">Imprimir Relatório</button>
-                    <button onClick={() => setViewingEval(null)} className="text-5xl text-slate-300 hover:text-rose-500">&times;</button>
+                    <button 
+                      onClick={() => setViewingEval(null)} 
+                      className="group flex items-center gap-3 bg-slate-100 hover:bg-rose-50 px-6 py-4 rounded-2xl transition-all"
+                    >
+                      <span className="text-[10px] font-black text-slate-400 group-hover:text-rose-600 uppercase tracking-widest">Voltar ao Painel</span>
+                      <span className="text-3xl text-slate-300 group-hover:text-rose-500 leading-none">&times;</span>
+                    </button>
                  </div>
               </div>
 
@@ -399,7 +405,8 @@ const EvaluationSystem: React.FC<EvaluationSystemProps> = ({ clients, evaluation
                  <div className="space-y-8">
                     <h6 className="text-xs font-black uppercase text-slate-400 tracking-[0.2em] border-b-2 border-slate-100 pb-3">Perímetros Corporais (cm)</h6>
                     <div className="grid grid-cols-1 gap-5">
-                       {Object.entries(viewingEval.perimeters).filter(([_,v]) => v > 0).map(([k, v]) => (
+                       {/* Fix: Cast Object.entries to [string, number][] to avoid operator '>' error on unknown type */}
+                       {(Object.entries(viewingEval.perimeters) as [string, number][]).filter(([_,v]) => v > 0).map(([k, v]) => (
                          <div key={k} className="flex justify-between items-center bg-slate-50 p-4 rounded-2xl border border-slate-100">
                             <span className="text-[10px] font-black text-slate-500 uppercase">{PERIMETER_LABELS[k] || k}</span>
                             <span className="text-base font-black text-slate-800">{v} <span className="text-[10px]">cm</span></span>
