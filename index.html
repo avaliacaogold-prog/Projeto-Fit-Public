@@ -3,29 +3,33 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VitalMetric Pro - Diagnóstico & Performance</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>VitalMetric Pro - Inteligência em Performance</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
+        * { -webkit-tap-highlight-color: transparent; }
         body { 
           font-family: 'Plus Jakarta Sans', sans-serif; 
           background-color: #f8fafc;
           -webkit-font-smoothing: antialiased;
+          overscroll-behavior-y: contain;
         }
+        
+        /* Previne zoom automático em inputs no iOS */
+        input, select, textarea { font-size: 16px !important; }
+        @media (min-width: 768px) {
+          input, select, textarea { font-size: 14px !important; }
+        }
+
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .thin-scrollbar::-webkit-scrollbar { width: 4px; }
         .thin-scrollbar::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
         
         @media print { 
-          /* 1. Esconder TUDO que não é o relatório */
-          .no-print, aside, header, .no-print * { 
-            display: none !important; 
-          }
-          
-          /* 2. Resetar containers para fluxo vertical infinito no PDF */
+          .no-print, aside, header, nav, button { display: none !important; }
           html, body {
             height: auto !important;
             overflow: visible !important;
@@ -35,66 +39,12 @@
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
           }
-          
-          #root {
-            display: block !important;
-            height: auto !important;
-            overflow: visible !important;
-          }
-
-          main {
-            margin-left: 0 !important;
-            padding: 0 !important;
-            overflow: visible !important;
-            display: block !important;
-          }
-
-          /* 3. Forçar o modal a se comportar como uma página plana */
-          .fixed.inset-0 {
-            position: relative !important;
-            display: block !important;
-            background: white !important;
-            width: 100% !important;
-            height: auto !important;
-            overflow: visible !important;
-            z-index: auto !important;
-            padding: 0 !important;
-          }
-
-          /* Ajuste para o conteúdo interno do modal */
-          .max-w-5xl, .max-w-4xl {
-            max-width: 100% !important;
-            width: 100% !important;
-            margin: 0 !important;
-            box-shadow: none !important;
-            border: none !important;
-          }
-
-          .overflow-y-auto {
-            overflow: visible !important;
-            height: auto !important;
-            display: block !important;
-          }
-
-          /* 4. Cores e Gráficos */
-          * {
-            -webkit-print-color-adjust: exact !important;
-            print-color-adjust: exact !important;
-          }
-
-          /* 5. Quebras de página inteligentes */
-          .grid, .bg-white, .p-10 {
-            break-inside: avoid-page;
-          }
-
-          h1, h2, h3, h4, h5 {
-            break-after: avoid;
-          }
-
-          @page {
-            margin: 1.5cm;
-            size: auto;
-          }
+          #root { display: block !important; }
+          main { margin-left: 0 !important; padding: 0 !important; overflow: visible !important; display: block !important; }
+          .fixed { position: static !important; display: block !important; }
+          .shadow-2xl, .shadow-xl, .shadow-sm { box-shadow: none !important; }
+          .border, .border-2 { border-color: #f1f5f9 !important; }
+          @page { margin: 1.5cm; size: auto; }
         }
     </style>
 <script type="importmap">
@@ -109,7 +59,7 @@
 }
 </script>
 </head>
-<body class="text-slate-900">
+<body class="text-slate-900 overflow-x-hidden">
     <div id="root"></div>
     <script type="module" src="index.tsx"></script>
 </body>
